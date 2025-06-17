@@ -113,7 +113,7 @@ const Index = () => {
       </nav>
 
       {/* Desktop Content Offset */}
-      <style jsx>{`
+      <style>{`
         @media (min-width: 768px) {
           .max-w-7xl {
             margin-left: 16rem;
