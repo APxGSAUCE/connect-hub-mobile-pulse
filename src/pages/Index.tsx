@@ -3,13 +3,13 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Calendar, MessageSquare, Upload, Download, Plus, Bell, Users, BarChart3, Menu } from "lucide-react";
+import { CheckCircle2, Calendar, MessageSquare, Upload, Download, Plus, Bell, Users, BarChart3, User } from "lucide-react";
 import TaskManager from "@/components/TaskManager";
 import EventCalendar from "@/components/EventCalendar";
 import MessageCenter from "@/components/MessageCenter";
-import FileManager from "@/components/FileManager";
+import ProfileMenu from "@/components/ProfileMenu";
 
-type ActiveTab = 'dashboard' | 'tasks' | 'events' | 'messages' | 'files';
+type ActiveTab = 'dashboard' | 'tasks' | 'events' | 'messages' | 'profile';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -22,8 +22,8 @@ const Index = () => {
         return <EventCalendar />;
       case 'messages':
         return <MessageCenter />;
-      case 'files':
-        return <FileManager />;
+      case 'profile':
+        return <ProfileMenu />;
       default:
         return <Dashboard setActiveTab={setActiveTab} />;
     }
@@ -39,7 +39,7 @@ const Index = () => {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-bold text-gray-900">EmployeeHub</h1>
+              <h1 className="text-lg font-bold text-gray-900">PGIS Connect</h1>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="sm" className="relative">
@@ -69,7 +69,7 @@ const Index = () => {
             { id: 'tasks', icon: CheckCircle2, label: 'Tasks' },
             { id: 'events', icon: Calendar, label: 'Events' },
             { id: 'messages', icon: MessageSquare, label: 'Messages' },
-            { id: 'files', icon: Upload, label: 'Files' },
+            { id: 'profile', icon: User, label: 'Profile' },
           ].map((item) => (
             <button
               key={item.id}
@@ -140,10 +140,10 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: ActiveTab) => void })
         <Card className="hover:shadow-md transition-shadow active:scale-95">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Upload className="w-6 h-6 text-orange-600" />
+              <User className="w-6 h-6 text-orange-600" />
               <div>
-                <p className="text-xl font-bold">25</p>
-                <p className="text-xs text-gray-600">Files</p>
+                <p className="text-xl font-bold">5</p>
+                <p className="text-xs text-gray-600">Team</p>
               </div>
             </div>
           </CardContent>
@@ -176,12 +176,12 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: ActiveTab) => void })
             Schedule Event
           </Button>
           <Button 
-            onClick={() => setActiveTab('files')} 
+            onClick={() => setActiveTab('messages')} 
             className="w-full justify-start h-12 active:scale-95 transition-transform" 
             variant="outline"
           >
-            <Upload className="w-4 h-4 mr-3" />
-            Upload File
+            <MessageSquare className="w-4 h-4 mr-3" />
+            Send Message
           </Button>
         </CardContent>
       </Card>
@@ -209,10 +209,10 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: ActiveTab) => void })
             <Badge variant="secondary" className="text-xs">1d</Badge>
           </div>
           <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg active:bg-gray-100 transition-colors">
-            <Upload className="w-4 h-4 text-orange-600 flex-shrink-0" />
+            <Calendar className="w-4 h-4 text-orange-600 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">File uploaded</p>
-              <p className="text-xs text-gray-600 truncate">Project proposal.pdf</p>
+              <p className="text-sm font-medium truncate">Event scheduled</p>
+              <p className="text-xs text-gray-600 truncate">Team meeting tomorrow</p>
             </div>
             <Badge variant="secondary" className="text-xs">2d</Badge>
           </div>

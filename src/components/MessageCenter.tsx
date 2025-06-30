@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, MessageSquare, Send, Search, Filter, Clock, CheckCheck } from "lucide-react";
+import { Plus, MessageSquare, Send, Search, Filter, Clock, CheckCheck, Paperclip, File, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -21,6 +20,14 @@ interface Message {
   isRead: boolean;
   priority: 'low' | 'medium' | 'high';
   thread?: string;
+  attachments?: FileAttachment[];
+}
+
+interface FileAttachment {
+  id: string;
+  name: string;
+  size: string;
+  type: string;
 }
 
 interface Thread {
@@ -48,7 +55,10 @@ const MessageCenter = () => {
       timestamp: '2024-01-17T10:30:00Z',
       isRead: false,
       priority: 'high',
-      thread: 'thread-1'
+      thread: 'thread-1',
+      attachments: [
+        { id: '1', name: 'project_requirements.pdf', size: '2.5 MB', type: 'application/pdf' }
+      ]
     },
     {
       id: '2',
@@ -70,7 +80,11 @@ const MessageCenter = () => {
       timestamp: '2024-01-16T14:20:00Z',
       isRead: true,
       priority: 'low',
-      thread: 'thread-3'
+      thread: 'thread-3',
+      attachments: [
+        { id: '2', name: 'employee_handbook.pdf', size: '1.8 MB', type: 'application/pdf' },
+        { id: '3', name: 'benefits_overview.docx', size: '892 KB', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+      ]
     }
   ]);
 
@@ -78,8 +92,24 @@ const MessageCenter = () => {
     recipient: '',
     subject: '',
     content: '',
-    priority: 'medium' as const
+    priority: 'medium' as const,
+    attachments: [] as File[]
   });
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      setNewMessage({
+        ...newMessage,
+        attachments: [...newMessage.attachments, ...Array.from(files)]
+      });
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    const updatedAttachments = newMessage.attachments.filter((_, i) => i !== index);
+    setNewMessage({ ...newMessage, attachments: updatedAttachments });
+  };
 
   const handleSendMessage = () => {
     if (!newMessage.recipient || !newMessage.subject || !newMessage.content) {
@@ -91,13 +121,24 @@ const MessageCenter = () => {
       return;
     }
 
+    const attachments = newMessage.attachments.map((file, index) => ({
+      id: `att-${Date.now()}-${index}`,
+      name: file.name,
+      size: formatFileSize(file.size),
+      type: file.type
+    }));
+
     const message: Message = {
       id: Date.now().toString(),
-      ...newMessage,
+      subject: newMessage.subject,
+      content: newMessage.content,
+      recipient: newMessage.recipient,
+      priority: newMessage.priority,
       sender: 'John Doe', // Current user
       timestamp: new Date().toISOString(),
       isRead: true,
-      thread: `thread-${Date.now()}`
+      thread: `thread-${Date.now()}`,
+      attachments: attachments.length > 0 ? attachments : undefined
     };
 
     setMessages([message, ...messages]);
@@ -105,7 +146,8 @@ const MessageCenter = () => {
       recipient: '',
       subject: '',
       content: '',
-      priority: 'medium'
+      priority: 'medium',
+      attachments: []
     });
     setActiveView('sent');
 
@@ -113,6 +155,21 @@ const MessageCenter = () => {
       title: "Success",
       description: "Message sent successfully!",
     });
+  };
+
+  const handleDownloadAttachment = (attachment: FileAttachment) => {
+    toast({
+      title: "Download Started",
+      description: `Downloading ${attachment.name}...`,
+    });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const markAsRead = (messageId: string) => {
@@ -169,7 +226,7 @@ const MessageCenter = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Message Center</h2>
-          <p className="text-gray-600">Team communication hub</p>
+          <p className="text-gray-600">Team communication with file sharing</p>
         </div>
 
         <Button onClick={() => setActiveView('compose')}>
@@ -218,12 +275,12 @@ const MessageCenter = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Clock className="w-6 h-6 text-purple-600" />
+              <Paperclip className="w-6 h-6 text-purple-600" />
               <div>
                 <p className="text-2xl font-bold">
-                  {messages.filter(m => m.priority === 'high').length}
+                  {messages.reduce((acc, msg) => acc + (msg.attachments?.length || 0), 0)}
                 </p>
-                <p className="text-sm text-gray-600">Priority</p>
+                <p className="text-sm text-gray-600">Files Shared</p>
               </div>
             </div>
           </CardContent>
@@ -261,7 +318,7 @@ const MessageCenter = () => {
         <Card>
           <CardHeader>
             <CardTitle>Compose New Message</CardTitle>
-            <CardDescription>Send a message to your team members</CardDescription>
+            <CardDescription>Send a message with file attachments to your team members</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">
@@ -292,6 +349,50 @@ const MessageCenter = () => {
                 onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
               />
             </div>
+            
+            {/* File Upload Section */}
+            <div className="grid gap-2">
+              <Label htmlFor="attachments">Attachments</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="attachments"
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="sm">
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  Add Files
+                </Button>
+              </div>
+              
+              {/* Show attached files */}
+              {newMessage.attachments.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  <p className="text-sm font-medium text-gray-700">Attached Files:</p>
+                  {newMessage.attachments.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <File className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{file.name}</span>
+                        <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachment(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <Label htmlFor="priority">Priority:</Label>
@@ -363,6 +464,9 @@ const MessageCenter = () => {
                           {!message.isRead && activeView === 'inbox' && (
                             <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                           )}
+                          {message.attachments && message.attachments.length > 0 && (
+                            <Paperclip className="w-3 h-3 text-gray-500" />
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <Badge className={getPriorityColor(message.priority)} variant="secondary">
@@ -382,6 +486,31 @@ const MessageCenter = () => {
                       <p className="text-sm text-gray-600 mt-1 truncate">
                         {message.content}
                       </p>
+                      
+                      {/* Show attachments */}
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {message.attachments.map((attachment) => (
+                            <div key={attachment.id} className="flex items-center space-x-2 text-xs text-gray-600">
+                              <File className="w-3 h-3" />
+                              <span>{attachment.name}</span>
+                              <span>({attachment.size})</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadAttachment(attachment);
+                                }}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
