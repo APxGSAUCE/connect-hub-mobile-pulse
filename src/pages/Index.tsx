@@ -4,21 +4,24 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Calendar, MessageSquare, Upload, Download, Plus, Bell, Users, BarChart3, User, LogOut } from "lucide-react";
+import { CheckCircle2, Calendar, MessageSquare, Plus, Bell, Users, BarChart3, User, LogOut, Loader2 } from "lucide-react";
 import TaskManager from "@/components/TaskManager";
 import EventCalendar from "@/components/EventCalendar";
 import MessageCenter from "@/components/MessageCenter";
 import ProfileMenu from "@/components/ProfileMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 type ActiveTab = 'dashboard' | 'tasks' | 'events' | 'messages' | 'profile';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -27,25 +30,58 @@ const Index = () => {
     }
 
     if (user) {
-      // Fetch user profile
-      const fetchProfile = async () => {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          setUserProfile(data);
-        }
-      };
       fetchProfile();
     }
   }, [user, loading, navigate]);
 
+  const fetchProfile = async () => {
+    if (!user) return;
+    
+    setLoadingProfile(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+      }
+      
+      if (data) {
+        setUserProfile(data);
+      } else {
+        // Set default profile data
+        setUserProfile({
+          first_name: user.user_metadata?.first_name || '',
+          last_name: user.user_metadata?.last_name || '',
+          email: user.email
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
+    try {
+      await signOut();
+      toast({
+        title: "Signed Out",
+        description: "You have been successfully signed out.",
+      });
+      navigate("/auth");
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const renderContent = () => {
@@ -63,14 +99,17 @@ const Index = () => {
     }
   };
 
-  if (loading) {
+  if (loading || loadingProfile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-600">Loading PGIS Connect...</p>
+          <div className="flex items-center space-x-2">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <p className="text-gray-600">Loading PGIS Connect...</p>
+          </div>
         </div>
       </div>
     );
@@ -85,6 +124,7 @@ const Index = () => {
     : user.email;
 
   const getInitials = (name: string) => {
+    if (!name) return 'U';
     const names = name.split(' ');
     if (names.length >= 2) {
       return `${names[0][0]}${names[1][0]}`.toUpperCase();
@@ -95,7 +135,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Mobile-Optimized Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-50 safe-area-top">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="px-4 sm:px-6">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-3">
@@ -130,7 +170,7 @@ const Index = () => {
       </div>
 
       {/* Enhanced Bottom Navigation for Mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
         <div className="grid grid-cols-5 h-16">
           {[
             { id: 'dashboard', icon: BarChart3, label: 'Dashboard' },

@@ -6,11 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, LogOut, Edit3, Save, X } from "lucide-react";
+import { User, Settings, LogOut, Edit3, Save, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+interface ProfileData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: string;
+  position: string;
+  phone: string;
+  bio: string;
+}
 
 const ProfileMenu = () => {
   const { toast } = useToast();
@@ -18,14 +28,15 @@ const ProfileMenu = () => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [profileData, setProfileData] = useState({
+  const [fetchingProfile, setFetchingProfile] = useState(true);
+  const [profileData, setProfileData] = useState<ProfileData>({
     firstName: '',
     lastName: '',
     email: '',
-    department: '',
-    position: '',
-    phone: '',
-    bio: ''
+    department: 'Engineering',
+    position: 'Senior Developer',
+    phone: '+1 (555) 123-4567',
+    bio: 'Passionate developer with 5+ years of experience in full-stack development.'
   });
 
   useEffect(() => {
@@ -37,6 +48,7 @@ const ProfileMenu = () => {
   const fetchProfile = async () => {
     if (!user) return;
     
+    setFetchingProfile(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -46,6 +58,11 @@ const ProfileMenu = () => {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load profile data.",
+          variant: "destructive"
+        });
         return;
       }
 
@@ -54,7 +71,7 @@ const ProfileMenu = () => {
           firstName: data.first_name || '',
           lastName: data.last_name || '',
           email: data.email || user.email || '',
-          department: 'Engineering', // Default values for demo
+          department: 'Engineering',
           position: 'Senior Developer',
           phone: '+1 (555) 123-4567',
           bio: 'Passionate developer with 5+ years of experience in full-stack development.'
@@ -62,8 +79,8 @@ const ProfileMenu = () => {
       } else {
         // Set default values if no profile exists
         setProfileData({
-          firstName: '',
-          lastName: '',
+          firstName: user.user_metadata?.first_name || '',
+          lastName: user.user_metadata?.last_name || '',
           email: user.email || '',
           department: 'Engineering',
           position: 'Senior Developer',
@@ -73,11 +90,42 @@ const ProfileMenu = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data.",
+        variant: "destructive"
+      });
+    } finally {
+      setFetchingProfile(false);
     }
+  };
+
+  const validateProfile = () => {
+    if (!profileData.firstName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "First name is required.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (!profileData.lastName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Last name is required.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
   };
 
   const handleSave = async () => {
     if (!user) return;
+    
+    if (!validateProfile()) return;
     
     setLoading(true);
     try {
@@ -85,13 +133,14 @@ const ProfileMenu = () => {
         .from('profiles')
         .upsert({
           id: user.id,
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
+          first_name: profileData.firstName.trim(),
+          last_name: profileData.lastName.trim(),
           email: profileData.email,
           updated_at: new Date().toISOString()
         });
 
       if (error) {
+        console.error('Error updating profile:', error);
         toast({
           title: "Error",
           description: "Failed to update profile. Please try again.",
@@ -105,6 +154,7 @@ const ProfileMenu = () => {
         });
       }
     } catch (error) {
+      console.error('Error updating profile:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -121,8 +171,21 @@ const ProfileMenu = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
+    try {
+      await signOut();
+      toast({
+        title: "Signed Out",
+        description: "You have been successfully signed out.",
+      });
+      navigate("/auth");
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getInitials = (firstName: string, lastName: string) => {
@@ -131,6 +194,16 @@ const ProfileMenu = () => {
     }
     return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
   };
+
+  if (fetchingProfile) {
+    return (
+      <div className="space-y-6 pb-20 md:pb-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -201,6 +274,7 @@ const ProfileMenu = () => {
                   id="firstName"
                   value={profileData.firstName}
                   onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                  disabled={loading}
                 />
               ) : (
                 <p className="text-gray-900 font-medium">{profileData.firstName || 'Not set'}</p>
@@ -213,6 +287,7 @@ const ProfileMenu = () => {
                   id="lastName"
                   value={profileData.lastName}
                   onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                  disabled={loading}
                 />
               ) : (
                 <p className="text-gray-900 font-medium">{profileData.lastName || 'Not set'}</p>
@@ -254,8 +329,17 @@ const ProfileMenu = () => {
                 Cancel
               </Button>
               <Button onClick={handleSave} disabled={loading}>
-                <Save className="w-4 h-4 mr-2" />
-                {loading ? 'Saving...' : 'Save Changes'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -296,7 +380,7 @@ const ProfileMenu = () => {
               <h4 className="font-medium text-red-900">Sign Out</h4>
               <p className="text-sm text-red-600">Sign out of your PGIS Connect account</p>
             </div>
-            <Button variant="destructive" size="sm" onClick={handleSignOut}>
+            <Button variant="destructive" size="sm" onClick={handleSignOut} disabled={loading}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>

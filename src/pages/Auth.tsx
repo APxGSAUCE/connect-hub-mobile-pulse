@@ -21,7 +21,6 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -31,31 +30,99 @@ const Auth = () => {
     checkAuth();
   }, [navigate]);
 
+  const validateForm = () => {
+    if (!email.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Email is required.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (!password.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Password is required.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (!isLogin) {
+      if (!firstName.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "First name is required.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      if (!lastName.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Last name is required.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      if (password.length < 6) {
+        toast({
+          title: "Validation Error",
+          description: "Password must be at least 6 characters long.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
 
         if (error) {
+          let errorMessage = "An error occurred during login.";
+          
           if (error.message.includes("Invalid login credentials")) {
-            toast({
-              title: "Login Failed",
-              description: "Invalid email or password. Please check your credentials and try again.",
-              variant: "destructive"
-            });
-          } else {
-            toast({
-              title: "Login Failed",
-              description: error.message,
-              variant: "destructive"
-            });
+            errorMessage = "Invalid email or password. Please check your credentials and try again.";
+          } else if (error.message.includes("Email not confirmed")) {
+            errorMessage = "Please check your email and confirm your account before logging in.";
+          } else if (error.message.includes("Too many requests")) {
+            errorMessage = "Too many login attempts. Please wait a moment before trying again.";
           }
+
+          toast({
+            title: "Login Failed",
+            description: errorMessage,
+            variant: "destructive"
+          });
         } else {
           toast({
             title: "Welcome back!",
@@ -64,43 +131,36 @@ const Auth = () => {
           navigate("/");
         }
       } else {
-        if (!firstName.trim() || !lastName.trim()) {
-          toast({
-            title: "Signup Failed",
-            description: "Please fill in all required fields.",
-            variant: "destructive"
-          });
-          return;
-        }
-
         const redirectUrl = `${window.location.origin}/`;
         
         const { error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
             emailRedirectTo: redirectUrl,
             data: {
-              first_name: firstName,
-              last_name: lastName,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
             }
           }
         });
 
         if (error) {
+          let errorMessage = "An error occurred during signup.";
+          
           if (error.message.includes("User already registered")) {
-            toast({
-              title: "Account Already Exists",
-              description: "An account with this email already exists. Please try logging in instead.",
-              variant: "destructive"
-            });
-          } else {
-            toast({
-              title: "Signup Failed",
-              description: error.message,
-              variant: "destructive"
-            });
+            errorMessage = "An account with this email already exists. Please try logging in instead.";
+          } else if (error.message.includes("Password should be at least")) {
+            errorMessage = "Password must be at least 6 characters long.";
+          } else if (error.message.includes("Unable to validate email address")) {
+            errorMessage = "Please enter a valid email address.";
           }
+
+          toast({
+            title: "Signup Failed",
+            description: errorMessage,
+            variant: "destructive"
+          });
         } else {
           toast({
             title: "Account Created!",
@@ -114,6 +174,7 @@ const Auth = () => {
         }
       }
     } catch (error) {
+      console.error("Auth error:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -122,6 +183,14 @@ const Auth = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleMode = () => {
+    setIsLogin(!isLogin);
+    setEmail("");
+    setPassword("");
+    setFirstName("");
+    setLastName("");
   };
 
   return (
@@ -154,6 +223,7 @@ const Auth = () => {
                       onChange={(e) => setFirstName(e.target.value)}
                       className="pl-10"
                       required={!isLogin}
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -169,6 +239,7 @@ const Auth = () => {
                       onChange={(e) => setLastName(e.target.value)}
                       className="pl-10"
                       required={!isLogin}
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -187,6 +258,7 @@ const Auth = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -203,11 +275,13 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -220,21 +294,23 @@ const Auth = () => {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Please wait...</span>
+                </div>
+              ) : (
+                isLogin ? "Sign In" : "Create Account"
+              )}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setEmail("");
-                setPassword("");
-                setFirstName("");
-                setLastName("");
-              }}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              onClick={toggleMode}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors disabled:opacity-50"
+              disabled={loading}
             >
               {isLogin 
                 ? "Don't have an account? Sign up here" 
