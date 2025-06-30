@@ -1,18 +1,52 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Calendar, MessageSquare, Upload, Download, Plus, Bell, Users, BarChart3, User } from "lucide-react";
+import { CheckCircle2, Calendar, MessageSquare, Upload, Download, Plus, Bell, Users, BarChart3, User, LogOut } from "lucide-react";
 import TaskManager from "@/components/TaskManager";
 import EventCalendar from "@/components/EventCalendar";
 import MessageCenter from "@/components/MessageCenter";
 import ProfileMenu from "@/components/ProfileMenu";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 type ActiveTab = 'dashboard' | 'tasks' | 'events' | 'messages' | 'profile';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+      return;
+    }
+
+    if (user) {
+      // Fetch user profile
+      const fetchProfile = async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) {
+          setUserProfile(data);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -25,8 +59,37 @@ const Index = () => {
       case 'profile':
         return <ProfileMenu />;
       default:
-        return <Dashboard setActiveTab={setActiveTab} />;
+        return <Dashboard setActiveTab={setActiveTab} userProfile={userProfile} />;
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Users className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-gray-600">Loading PGIS Connect...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const displayName = userProfile 
+    ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || user.email
+    : user.email;
+
+  const getInitials = (name: string) => {
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (
@@ -49,8 +112,13 @@ const Index = () => {
                 </span>
               </Button>
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-blue-600">JD</span>
+                <span className="text-sm font-medium text-blue-600">
+                  {getInitials(displayName)}
+                </span>
               </div>
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -91,11 +159,13 @@ const Index = () => {
 };
 
 // Mobile-Optimized Dashboard Component
-const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: ActiveTab) => void }) => {
+const Dashboard = ({ setActiveTab, userProfile }: { setActiveTab: (tab: ActiveTab) => void, userProfile: any }) => {
+  const firstName = userProfile?.first_name || 'User';
+
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-xl font-bold text-gray-900">Welcome back, John!</h2>
+        <h2 className="text-xl font-bold text-gray-900">Welcome back, {firstName}!</h2>
         <p className="text-gray-600 text-sm">Here's what's happening today</p>
       </div>
 

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,35 +8,128 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { User, Settings, LogOut, Edit3, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const ProfileMenu = () => {
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@pgis.com',
-    department: 'Engineering',
-    position: 'Senior Developer',
-    phone: '+1 (555) 123-4567',
-    bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+    firstName: '',
+    lastName: '',
+    email: '',
+    department: '',
+    position: '',
+    phone: '',
+    bio: ''
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been successfully updated.",
-    });
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
+  const fetchProfile = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      if (data) {
+        setProfileData({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          email: data.email || user.email || '',
+          department: 'Engineering', // Default values for demo
+          position: 'Senior Developer',
+          phone: '+1 (555) 123-4567',
+          bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+        });
+      } else {
+        // Set default values if no profile exists
+        setProfileData({
+          firstName: '',
+          lastName: '',
+          email: user.email || '',
+          department: 'Engineering',
+          position: 'Senior Developer',
+          phone: '+1 (555) 123-4567',
+          bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
+          email: profileData.email,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive"
+        });
+      } else {
+        setIsEditing(false);
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been successfully updated.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Reset form data if needed
+    fetchProfile(); // Reset form data
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    if (!firstName && !lastName) {
+      return user?.email?.slice(0, 2).toUpperCase() || 'U';
+    }
+    return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
   };
 
   return (
@@ -49,6 +142,7 @@ const ProfileMenu = () => {
         <Button
           onClick={() => setIsEditing(!isEditing)}
           variant={isEditing ? "outline" : "default"}
+          disabled={loading}
         >
           {isEditing ? (
             <>
@@ -75,7 +169,10 @@ const ProfileMenu = () => {
             </Avatar>
             <div className="flex-1">
               <h3 className="text-xl font-semibold text-gray-900">
-                {profileData.firstName} {profileData.lastName}
+                {profileData.firstName || profileData.lastName 
+                  ? `${profileData.firstName} ${profileData.lastName}`.trim()
+                  : 'User'
+                }
               </h3>
               <p className="text-gray-600">{profileData.position}</p>
               <div className="flex items-center space-x-2 mt-2">
@@ -106,7 +203,7 @@ const ProfileMenu = () => {
                   onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
                 />
               ) : (
-                <p className="text-gray-900 font-medium">{profileData.firstName}</p>
+                <p className="text-gray-900 font-medium">{profileData.firstName || 'Not set'}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -118,89 +215,47 @@ const ProfileMenu = () => {
                   onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
                 />
               ) : (
-                <p className="text-gray-900 font-medium">{profileData.lastName}</p>
+                <p className="text-gray-900 font-medium">{profileData.lastName || 'Not set'}</p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            {isEditing ? (
-              <Input
-                id="email"
-                type="email"
-                value={profileData.email}
-                onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-              />
-            ) : (
-              <p className="text-gray-900 font-medium">{profileData.email}</p>
-            )}
+            <p className="text-gray-900 font-medium">{profileData.email}</p>
+            <p className="text-xs text-gray-500">Email cannot be changed here</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
-              {isEditing ? (
-                <Input
-                  id="department"
-                  value={profileData.department}
-                  onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{profileData.department}</p>
-              )}
+              <p className="text-gray-900 font-medium">{profileData.department}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="position">Position</Label>
-              {isEditing ? (
-                <Input
-                  id="position"
-                  value={profileData.position}
-                  onChange={(e) => setProfileData({ ...profileData, position: e.target.value })}
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{profileData.position}</p>
-              )}
+              <p className="text-gray-900 font-medium">{profileData.position}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            {isEditing ? (
-              <Input
-                id="phone"
-                value={profileData.phone}
-                onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-              />
-            ) : (
-              <p className="text-gray-900 font-medium">{profileData.phone}</p>
-            )}
+            <p className="text-gray-900 font-medium">{profileData.phone}</p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>
-            {isEditing ? (
-              <textarea
-                id="bio"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                value={profileData.bio}
-                onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-              />
-            ) : (
-              <p className="text-gray-700">{profileData.bio}</p>
-            )}
+            <p className="text-gray-700">{profileData.bio}</p>
           </div>
 
           {isEditing && (
             <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} disabled={loading}>
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
-              <Button onClick={handleSave}>
+              <Button onClick={handleSave} disabled={loading}>
                 <Save className="w-4 h-4 mr-2" />
-                Save Changes
+                {loading ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           )}
@@ -241,7 +296,7 @@ const ProfileMenu = () => {
               <h4 className="font-medium text-red-900">Sign Out</h4>
               <p className="text-sm text-red-600">Sign out of your PGIS Connect account</p>
             </div>
-            <Button variant="destructive" size="sm">
+            <Button variant="destructive" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
