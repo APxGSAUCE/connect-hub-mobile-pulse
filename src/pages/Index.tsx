@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +11,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import MessageCenter from "@/components/MessageCenter";
+import SimpleMessageCenter from "@/components/SimpleMessageCenter";
 import EventCalendar from "@/components/EventCalendar";
 import ProfileMenu from "@/components/ProfileMenu";
 import EmployeeManagement from "@/components/EmployeeManagement";
@@ -63,32 +62,56 @@ const Index = () => {
     try {
       setLoading(true);
 
-      // Fetch dashboard stats
-      const { data: statsData, error: statsError } = await supabase
-        .rpc('get_dashboard_stats', { user_id: user.id });
+      // Fetch dashboard stats using individual queries for better reliability
+      const [messagesResult, employeesResult, eventsResult, notificationsResult] = await Promise.all([
+        // Get total messages for user's groups
+        supabase
+          .from('messages')
+          .select('id, group_id!inner(chat_group_members!inner(user_id))')
+          .eq('group_id.chat_group_members.user_id', user.id),
+        
+        // Get active employees
+        supabase
+          .from('profiles')
+          .select('id')
+          .eq('status', 'active'),
+        
+        // Get upcoming events
+        supabase
+          .from('events')
+          .select('id')
+          .gte('start_date', new Date().toISOString()),
+        
+        // Get unread notifications
+        supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+      ]);
 
-      if (statsError) throw statsError;
-      
-      if (statsData && typeof statsData === 'object' && !Array.isArray(statsData)) {
-        const typedStats = statsData as unknown as DashboardStats;
-        setStats({
-          total_messages: Number(typedStats.total_messages) || 0,
-          unread_messages: Number(typedStats.unread_messages) || 0,
-          upcoming_events: Number(typedStats.upcoming_events) || 0,
-          total_employees: Number(typedStats.total_employees) || 0,
-          unread_notifications: Number(typedStats.unread_notifications) || 0
-        });
-      }
+      // Get unread messages count
+      const { data: unreadMessages } = await supabase
+        .from('messages')
+        .select('id, sender_id, group_id!inner(chat_group_members!inner(user_id))')
+        .eq('group_id.chat_group_members.user_id', user.id)
+        .neq('sender_id', user.id);
+
+      setStats({
+        total_messages: messagesResult.data?.length || 0,
+        unread_messages: unreadMessages?.length || 0,
+        upcoming_events: eventsResult.data?.length || 0,
+        total_employees: employeesResult.data?.length || 0,
+        unread_notifications: notificationsResult.data?.length || 0
+      });
 
       // Fetch recent notifications for activity feed
-      const { data: notifications, error: notificationError } = await supabase
+      const { data: notifications } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
-
-      if (notificationError) throw notificationError;
 
       // Convert notifications to activity format
       const activity: RecentActivity[] = (notifications || []).map(notification => ({
@@ -365,7 +388,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="messages">
-            <MessageCenter />
+            <SimpleMessageCenter />
           </TabsContent>
 
           <TabsContent value="events">
