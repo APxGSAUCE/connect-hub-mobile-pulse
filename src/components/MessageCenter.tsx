@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -180,7 +179,7 @@ const MessageCenter = () => {
         .from('messages')
         .select(`
           *,
-          sender:profiles!inner (
+          sender:profiles!messages_sender_id_fkey (
             first_name,
             last_name,
             email
@@ -193,7 +192,10 @@ const MessageCenter = () => {
       
       const typedMessages = (data || []).map(msg => ({
         ...msg,
-        message_type: msg.message_type as 'text' | 'file' | 'image'
+        message_type: msg.message_type as 'text' | 'file' | 'image',
+        sender: msg.sender && typeof msg.sender === 'object' && !Array.isArray(msg.sender) && 'first_name' in msg.sender 
+          ? msg.sender as { first_name: string; last_name: string; email: string }
+          : undefined
       }));
       
       setMessages(typedMessages);
@@ -243,7 +245,7 @@ const MessageCenter = () => {
     }
   };
 
-  const createDirectMessage = async (employeeId: string) => {
+  const createDirectMessage = async (employeeId: string, employeeName: string) => {
     try {
       const { data, error } = await supabase.rpc('create_direct_message_group', {
         other_user_id: employeeId
@@ -253,7 +255,7 @@ const MessageCenter = () => {
 
       toast({
         title: "Success",
-        description: "Direct message conversation created.",
+        description: `Direct message with ${employeeName} created.`,
       });
 
       // Refresh groups and open the new chat
@@ -429,7 +431,7 @@ const MessageCenter = () => {
                         </div>
                         <Button 
                           size="sm" 
-                          onClick={() => createDirectMessage(employee.id)}
+                          onClick={() => createDirectMessage(employee.id, `${employee.first_name} ${employee.last_name}`)}
                         >
                           <MessageSquare className="w-4 h-4 mr-1" />
                           Message
@@ -500,6 +502,7 @@ const MessageCenter = () => {
         </>
       )}
 
+      
       {activeView === 'new-group' && (
         <>
           <div className="flex items-center space-x-4">
@@ -613,6 +616,7 @@ const MessageCenter = () => {
         </>
       )}
 
+      
       {activeView === 'chat' && activeGroup && (
         <>
           <div className="flex items-center justify-between">
@@ -648,9 +652,9 @@ const MessageCenter = () => {
                         ? 'bg-blue-600 text-white' 
                         : 'bg-gray-100 text-gray-900'
                     }`}>
-                      {message.sender_id !== user?.id && (
+                      {message.sender_id !== user?.id && message.sender && (
                         <p className="text-xs font-medium mb-1">
-                          {message.sender?.first_name} {message.sender?.last_name}
+                          {message.sender.first_name} {message.sender.last_name}
                         </p>
                       )}
                       <p className="text-sm">{message.content}</p>

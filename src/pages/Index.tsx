@@ -68,8 +68,16 @@ const Index = () => {
         .rpc('get_dashboard_stats', { user_id: user.id });
 
       if (statsError) throw statsError;
-      if (statsData && typeof statsData === 'object') {
-        setStats(statsData as DashboardStats);
+      
+      if (statsData && typeof statsData === 'object' && !Array.isArray(statsData)) {
+        const typedStats = statsData as unknown as DashboardStats;
+        setStats({
+          total_messages: Number(typedStats.total_messages) || 0,
+          unread_messages: Number(typedStats.unread_messages) || 0,
+          upcoming_events: Number(typedStats.upcoming_events) || 0,
+          total_employees: Number(typedStats.total_employees) || 0,
+          unread_notifications: Number(typedStats.unread_notifications) || 0
+        });
       }
 
       // Fetch recent notifications for activity feed

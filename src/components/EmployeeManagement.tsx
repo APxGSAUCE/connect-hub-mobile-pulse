@@ -1,102 +1,76 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Users, Search, Filter, MessageSquare, UserCheck, UserX, 
-  Volume2, VolumeX, Building, Phone, Mail, MapPin, Loader2
+  MessageSquare, Users, Mail, Phone, MoreVertical, Ban, 
+  Volume2, CheckCircle, Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Employee {
   id: string;
   first_name: string;
   last_name: string;
   email: string;
-  phone: string;
-  position: string;
+  phone: string | null;
+  position: string | null;
   status: 'active' | 'muted' | 'blocked' | 'inactive';
-  role: 'admin' | 'manager' | 'employee';
-  department: {
-    id: string;
-    name: string;
-    description: string;
-  } | null;
-  created_at: string;
+  department_id: string | null;
 }
 
 interface Department {
   id: string;
   name: string;
-  description: string;
 }
 
 const EmployeeManagement = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [userRole, setUserRole] = useState<string>('employee');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
   useEffect(() => {
     fetchEmployees();
     fetchDepartments();
-    fetchUserRole();
   }, []);
 
-  const fetchUserRole = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) throw error;
-      setUserRole(data?.role || 'employee');
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-    }
-  };
-
   const fetchEmployees = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          position,
-          status,
-          role,
-          created_at,
-          department:departments(id, name, description)
-        `)
+        .select('*')
         .order('first_name');
 
+      if (selectedDepartment !== 'all') {
+        query = query.eq('department_id', selectedDepartment);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       
-      // Type assertion to ensure proper typing
       const typedEmployees = (data || []).map(emp => ({
         ...emp,
-        status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive',
-        role: emp.role as 'admin' | 'manager' | 'employee'
+        status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive'
       }));
-      
+
       setEmployees(typedEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -121,34 +95,31 @@ const EmployeeManagement = () => {
       setDepartments(data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load departments.",
+        variant: "destructive"
+      });
     }
   };
 
-  const updateEmployeeStatus = async (employeeId: string, newStatus: string) => {
-    if (userRole !== 'admin' && userRole !== 'manager') {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to update employee status.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const updateEmployeeStatus = async (employeeId: string, status: Employee['status']) => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ status: newStatus })
+        .update({ status })
         .eq('id', employeeId);
 
       if (error) throw error;
 
-      setEmployees(employees.map(emp => 
-        emp.id === employeeId ? { ...emp, status: newStatus as 'active' | 'muted' | 'blocked' | 'inactive' } : emp
+      // Optimistically update the employee status in the local state
+      setEmployees(employees.map(emp =>
+        emp.id === employeeId ? { ...emp, status } : emp
       ));
 
       toast({
-        title: "Status Updated",
-        description: `Employee status updated to ${newStatus}.`,
+        title: "Success",
+        description: `Employee status updated to ${status}.`,
       });
     } catch (error) {
       console.error('Error updating employee status:', error);
@@ -160,7 +131,7 @@ const EmployeeManagement = () => {
     }
   };
 
-  const startDirectMessage = async (employeeId: string) => {
+  const startDirectMessage = async (employeeId: string, employeeName: string) => {
     try {
       const { data, error } = await supabase.rpc('create_direct_message_group', {
         other_user_id: employeeId
@@ -169,14 +140,11 @@ const EmployeeManagement = () => {
       if (error) throw error;
 
       toast({
-        title: "Message Started",
-        description: "Direct message conversation created.",
+        title: "Success",
+        description: `Direct message with ${employeeName} started.`,
       });
-      
-      // In a real app, you would navigate to the message view
-      console.log('Created group:', data);
     } catch (error) {
-      console.error('Error creating direct message:', error);
+      console.error('Error starting direct message:', error);
       toast({
         title: "Error",
         description: "Failed to start direct message.",
@@ -185,47 +153,19 @@ const EmployeeManagement = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'muted': return 'bg-yellow-100 text-yellow-800';
-      case 'blocked': return 'bg-red-100 text-red-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'bg-purple-100 text-purple-800';
-      case 'manager': return 'bg-blue-100 text-blue-800';
-      case 'employee': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
 
-  const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = 
-      `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.position?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesDepartment = selectedDepartment === 'all' || employee.department?.id === selectedDepartment;
-    const matchesStatus = selectedStatus === 'all' || employee.status === selectedStatus;
-    
-    return matchesSearch && matchesDepartment && matchesStatus;
-  });
+  const filteredEmployees = employees.filter(emp =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const employeesByDepartment = departments.map(dept => ({
-    ...dept,
-    employees: filteredEmployees.filter(emp => emp.department?.id === dept.id)
-  }));
-
-  const employeesWithoutDepartment = filteredEmployees.filter(emp => !emp.department);
+  const handleDepartmentChange = (departmentId: string) => {
+    setSelectedDepartment(departmentId);
+    fetchEmployees();
+  };
 
   if (loading) {
     return (
@@ -239,360 +179,150 @@ const EmployeeManagement = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
+      {/* Header and Filters */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Employee Directory</h2>
-          <p className="text-gray-600">Manage employees and departments</p>
+          <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
+          <p className="text-gray-600">Manage your team members</p>
         </div>
       </div>
 
-      {/* Employee Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Users className="w-6 h-6 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{employees.length}</p>
-                <p className="text-sm text-gray-600">Total Employees</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <UserCheck className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">{employees.filter(e => e.status === 'active').length}</p>
-                <p className="text-sm text-gray-600">Active</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Building className="w-6 h-6 text-purple-600" />
-              <div>
-                <p className="text-2xl font-bold">{departments.length}</p>
-                <p className="text-sm text-gray-600">Departments</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <UserX className="w-6 h-6 text-red-600" />
-              <div>
-                <p className="text-2xl font-bold">{employees.filter(e => e.status === 'blocked').length}</p>
-                <p className="text-sm text-gray-600">Blocked</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+      {/* Filters */}
+      <div className="flex space-x-4 items-center">
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="search">Search:</Label>
           <Input
+            type="text"
+            id="search"
             placeholder="Search employees..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
           />
         </div>
-        <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="All Departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map((dept) => (
-              <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="muted">Muted</SelectItem>
-            <SelectItem value="blocked">Blocked</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <Label htmlFor="department">Department:</Label>
+          <Select value={selectedDepartment} onValueChange={handleDepartmentChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((department) => (
+                <SelectItem key={department.id} value={department.id}>
+                  {department.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Employee List by Department */}
-      <div className="space-y-6">
-        {employeesByDepartment.map((department) => (
-          department.employees.length > 0 && (
-            <Card key={department.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Building className="w-5 h-5" />
-                  <span>{department.name}</span>
-                  <Badge variant="secondary">{department.employees.length}</Badge>
-                </CardTitle>
-                <CardDescription>{department.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  {department.employees.map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center space-x-4">
-                        <Avatar className="w-12 h-12">
-                          <AvatarFallback className="bg-blue-100 text-blue-600">
-                            {getInitials(employee.first_name, employee.last_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-medium text-gray-900">
-                              {employee.first_name} {employee.last_name}
-                            </h4>
-                            <Badge className={getRoleColor(employee.role)} variant="secondary">
-                              {employee.role}
-                            </Badge>
-                            <Badge className={getStatusColor(employee.status)} variant="secondary">
-                              {employee.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">{employee.position || 'No position set'}</p>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-                            {employee.email && (
-                              <div className="flex items-center space-x-1">
-                                <Mail className="w-3 h-3" />
-                                <span>{employee.email}</span>
-                              </div>
-                            )}
-                            {employee.phone && (
-                              <div className="flex items-center space-x-1">
-                                <Phone className="w-3 h-3" />
-                                <span>{employee.phone}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => startDirectMessage(employee.id)}
-                          disabled={employee.id === user?.id}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-1" />
-                          Message
-                        </Button>
-
-                        {(userRole === 'admin' || userRole === 'manager') && employee.id !== user?.id && (
-                          <div className="flex space-x-1">
-                            {employee.status === 'active' && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateEmployeeStatus(employee.id, 'muted')}
-                                  className="text-yellow-600 hover:text-yellow-700"
-                                >
-                                  <VolumeX className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateEmployeeStatus(employee.id, 'blocked')}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <UserX className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                            {employee.status === 'muted' && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateEmployeeStatus(employee.id, 'active')}
-                                  className="text-green-600 hover:text-green-700"
-                                >
-                                  <Volume2 className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateEmployeeStatus(employee.id, 'blocked')}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <UserX className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                            {employee.status === 'blocked' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateEmployeeStatus(employee.id, 'active')}
-                                className="text-green-600 hover:text-green-700"
-                              >
-                                <UserCheck className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        ))}
-
-        {/* Employees without department */}
-        {employeesWithoutDepartment.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>Unassigned Department</span>
-                <Badge variant="secondary">{employeesWithoutDepartment.length}</Badge>
-              </CardTitle>
-              <CardDescription>Employees not assigned to any department</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {employeesWithoutDepartment.map((employee) => (
-                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-blue-100 text-blue-600">
-                          {getInitials(employee.first_name, employee.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-medium text-gray-900">
-                            {employee.first_name} {employee.last_name}
-                          </h4>
-                          <Badge className={getRoleColor(employee.role)} variant="secondary">
-                            {employee.role}
-                          </Badge>
-                          <Badge className={getStatusColor(employee.status)} variant="secondary">
-                            {employee.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">{employee.position || 'No position set'}</p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-                          {employee.email && (
-                            <div className="flex items-center space-x-1">
-                              <Mail className="w-3 h-3" />
-                              <span>{employee.email}</span>
-                            </div>
-                          )}
-                          {employee.phone && (
-                            <div className="flex items-center space-x-1">
-                              <Phone className="w-3 h-3" />
-                              <span>{employee.phone}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startDirectMessage(employee.id)}
-                        disabled={employee.id === user?.id}
-                      >
-                        <MessageSquare className="w-4 h-4 mr-1" />
-                        Message
-                      </Button>
-
-                      {(userRole === 'admin' || userRole === 'manager') && employee.id !== user?.id && (
-                        <div className="flex space-x-1">
-                          {employee.status === 'active' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateEmployeeStatus(employee.id, 'muted')}
-                                className="text-yellow-600 hover:text-yellow-700"
-                              >
-                                <VolumeX className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateEmployeeStatus(employee.id, 'blocked')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <UserX className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                          {employee.status === 'muted' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateEmployeeStatus(employee.id, 'active')}
-                                className="text-green-600 hover:text-green-700"
-                              >
-                                <Volume2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateEmployeeStatus(employee.id, 'blocked')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <UserX className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                          {employee.status === 'blocked' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateEmployeeStatus(employee.id, 'active')}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <UserCheck className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+      {/* Employee Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredEmployees.map((employee) => (
+          <Card key={employee.id} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+                      {getInitials(employee.first_name, employee.last_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {employee.first_name} {employee.last_name}
+                    </h3>
+                    <p className="text-sm text-gray-600">{employee.position || 'No position'}</p>
                   </div>
-                ))}
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => startDirectMessage(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </Button>
+                  {currentUser?.role === 'admin' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => updateEmployeeStatus(employee.id, 'muted')}
+                          disabled={employee.status === 'muted'}
+                        >
+                          <Volume2 className="w-4 h-4 mr-2" />
+                          Mute
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => updateEmployeeStatus(employee.id, 'blocked')}
+                          disabled={employee.status === 'blocked'}
+                        >
+                          <Ban className="w-4 h-4 mr-2" />
+                          Block
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => updateEmployeeStatus(employee.id, 'active')}
+                          disabled={employee.status === 'active'}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Activate
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Email</p>
+                  <p className="text-sm text-gray-500">
+                    <Mail className="w-4 h-4 mr-1 inline-block" />
+                    {employee.email}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Phone</p>
+                  <p className="text-sm text-gray-500">
+                    <Phone className="w-4 h-4 mr-1 inline-block" />
+                    {employee.phone || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Status</p>
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs ${
+                      employee.status === 'active' ? 'bg-green-100 text-green-600' :
+                      employee.status === 'muted' ? 'bg-yellow-100 text-yellow-600' :
+                      employee.status === 'blocked' ? 'bg-red-100 text-red-600' :
+                      'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {employee.status}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {filteredEmployees.length === 0 && (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
-              <p className="text-gray-600">
-                {searchTerm ? 'Try adjusting your search terms' : 'No employees match the current filters'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        ))}
       </div>
+
+      {filteredEmployees.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+          <p className="text-gray-600">
+            There are no employees matching your search criteria.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
