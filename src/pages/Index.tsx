@@ -68,8 +68,8 @@ const Index = () => {
         .rpc('get_dashboard_stats', { user_id: user.id });
 
       if (statsError) throw statsError;
-      if (statsData) {
-        setStats(statsData);
+      if (statsData && typeof statsData === 'object') {
+        setStats(statsData as DashboardStats);
       }
 
       // Fetch recent notifications for activity feed

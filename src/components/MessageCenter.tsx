@@ -43,6 +43,7 @@ interface Message {
   id: string;
   content: string;
   sender_id: string;
+  group_id: string;
   message_type: 'text' | 'file' | 'image';
   file_url?: string;
   file_name?: string;
@@ -140,7 +141,11 @@ const MessageCenter = () => {
 
       if (error) throw error;
 
-      const groups = data?.map(item => item.chat_groups).filter(Boolean) || [];
+      const groups = data?.map(item => ({
+        ...item.chat_groups,
+        group_type: item.chat_groups.group_type as 'direct' | 'group' | 'department'
+      })).filter(Boolean) || [];
+      
       setChatGroups(groups);
     } catch (error) {
       console.error('Error fetching chat groups:', error);
@@ -185,7 +190,13 @@ const MessageCenter = () => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      const typedMessages = (data || []).map(msg => ({
+        ...msg,
+        message_type: msg.message_type as 'text' | 'file' | 'image'
+      }));
+      
+      setMessages(typedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -256,7 +267,11 @@ const MessageCenter = () => {
         .single();
 
       if (!groupError && newGroup) {
-        openChat(newGroup);
+        const typedGroup: ChatGroup = {
+          ...newGroup,
+          group_type: newGroup.group_type as 'direct' | 'group' | 'department'
+        };
+        openChat(typedGroup);
       }
     } catch (error) {
       console.error('Error creating direct message:', error);

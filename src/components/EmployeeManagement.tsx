@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +89,15 @@ const EmployeeManagement = () => {
         .order('first_name');
 
       if (error) throw error;
-      setEmployees(data || []);
+      
+      // Type assertion to ensure proper typing
+      const typedEmployees = (data || []).map(emp => ({
+        ...emp,
+        status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive',
+        role: emp.role as 'admin' | 'manager' | 'employee'
+      }));
+      
+      setEmployees(typedEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast({
@@ -136,7 +143,7 @@ const EmployeeManagement = () => {
       if (error) throw error;
 
       setEmployees(employees.map(emp => 
-        emp.id === employeeId ? { ...emp, status: newStatus as any } : emp
+        emp.id === employeeId ? { ...emp, status: newStatus as 'active' | 'muted' | 'blocked' | 'inactive' } : emp
       ));
 
       toast({
