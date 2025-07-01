@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, LogOut, Edit3, Save, X, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { User, Settings, LogOut, Edit3, Save, X, Loader2, Building } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,10 +17,17 @@ interface ProfileData {
   firstName: string;
   lastName: string;
   email: string;
-  department: string;
+  department_id: string;
   position: string;
   phone: string;
-  bio: string;
+  status: string;
+  role: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  description: string;
 }
 
 const ProfileMenu = () => {
@@ -29,21 +37,38 @@ const ProfileMenu = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(true);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: '',
     lastName: '',
     email: '',
-    department: 'Engineering',
-    position: 'Senior Developer',
-    phone: '+1 (555) 123-4567',
-    bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+    department_id: '',
+    position: '',
+    phone: '',
+    status: 'active',
+    role: 'employee'
   });
 
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchDepartments();
     }
   }, [user]);
+
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -52,7 +77,10 @@ const ProfileMenu = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          department:departments(id, name, description)
+        `)
         .eq('id', user.id)
         .single();
 
@@ -71,10 +99,11 @@ const ProfileMenu = () => {
           firstName: data.first_name || '',
           lastName: data.last_name || '',
           email: data.email || user.email || '',
-          department: 'Engineering',
-          position: 'Senior Developer',
-          phone: '+1 (555) 123-4567',
-          bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+          department_id: data.department_id || '',
+          position: data.position || '',
+          phone: data.phone || '',
+          status: data.status || 'active',
+          role: data.role || 'employee'
         });
       } else {
         // Set default values if no profile exists
@@ -82,10 +111,11 @@ const ProfileMenu = () => {
           firstName: user.user_metadata?.first_name || '',
           lastName: user.user_metadata?.last_name || '',
           email: user.email || '',
-          department: 'Engineering',
-          position: 'Senior Developer',
-          phone: '+1 (555) 123-4567',
-          bio: 'Passionate developer with 5+ years of experience in full-stack development.'
+          department_id: user.user_metadata?.department_id || '',
+          position: '',
+          phone: '',
+          status: 'active',
+          role: 'employee'
         });
       }
     } catch (error) {
@@ -136,6 +166,9 @@ const ProfileMenu = () => {
           first_name: profileData.firstName.trim(),
           last_name: profileData.lastName.trim(),
           email: profileData.email,
+          department_id: profileData.department_id || null,
+          position: profileData.position.trim() || null,
+          phone: profileData.phone.trim() || null,
           updated_at: new Date().toISOString()
         });
 
@@ -195,6 +228,31 @@ const ProfileMenu = () => {
     return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'muted': return 'bg-yellow-100 text-yellow-800';
+      case 'blocked': return 'bg-red-100 text-red-800';
+      case 'inactive': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin': return 'bg-purple-100 text-purple-800';
+      case 'manager': return 'bg-blue-100 text-blue-800';
+      case 'employee': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getDepartmentName = () => {
+    if (!profileData.department_id) return 'No department assigned';
+    const dept = departments.find(d => d.id === profileData.department_id);
+    return dept?.name || 'Unknown department';
+  };
+
   if (fetchingProfile) {
     return (
       <div className="space-y-6 pb-20 md:pb-6">
@@ -247,10 +305,14 @@ const ProfileMenu = () => {
                   : 'User'
                 }
               </h3>
-              <p className="text-gray-600">{profileData.position}</p>
+              <p className="text-gray-600">{profileData.position || 'No position set'}</p>
               <div className="flex items-center space-x-2 mt-2">
-                <Badge variant="secondary">{profileData.department}</Badge>
-                <Badge variant="outline">Active</Badge>
+                <Badge className={getRoleColor(profileData.role)} variant="secondary">
+                  {profileData.role}
+                </Badge>
+                <Badge className={getStatusColor(profileData.status)} variant="secondary">
+                  {profileData.status}
+                </Badge>
               </div>
             </div>
           </div>
@@ -304,22 +366,70 @@ const ProfileMenu = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
-              <p className="text-gray-900 font-medium">{profileData.department}</p>
+              {isEditing ? (
+                <Select
+                  value={profileData.department_id}
+                  onValueChange={(value) => setProfileData({ ...profileData, department_id: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No department</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-gray-900 font-medium">{getDepartmentName()}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="position">Position</Label>
-              <p className="text-gray-900 font-medium">{profileData.position}</p>
+              {isEditing ? (
+                <Input
+                  id="position"
+                  value={profileData.position}
+                  onChange={(e) => setProfileData({ ...profileData, position: e.target.value })}
+                  disabled={loading}
+                  placeholder="Your job title"
+                />
+              ) : (
+                <p className="text-gray-900 font-medium">{profileData.position || 'Not set'}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            <p className="text-gray-900 font-medium">{profileData.phone}</p>
+            {isEditing ? (
+              <Input
+                id="phone"
+                value={profileData.phone}
+                onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                disabled={loading}
+                placeholder="Your phone number"
+              />
+            ) : (
+              <p className="text-gray-900 font-medium">{profileData.phone || 'Not set'}</p>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <p className="text-gray-700">{profileData.bio}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <p className="text-gray-900 font-medium capitalize">{profileData.role}</p>
+              <p className="text-xs text-gray-500">Role is managed by administrators</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <p className="text-gray-900 font-medium capitalize">{profileData.status}</p>
+              <p className="text-xs text-gray-500">Status is managed by administrators</p>
+            </div>
           </div>
 
           {isEditing && (

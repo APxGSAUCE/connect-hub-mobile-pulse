@@ -5,9 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Users, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users, Mail, Lock, User, Eye, EyeOff, Building } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+interface Department {
+  id: string;
+  name: string;
+  description: string;
+}
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +22,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -28,7 +37,22 @@ const Auth = () => {
       }
     };
     checkAuth();
+    fetchDepartments();
   }, [navigate]);
+
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
 
   const validateForm = () => {
     if (!email.trim()) {
@@ -63,6 +87,15 @@ const Auth = () => {
         toast({
           title: "Validation Error",
           description: "Last name is required.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      if (!selectedDepartment) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a department.",
           variant: "destructive"
         });
         return false;
@@ -141,6 +174,7 @@ const Auth = () => {
             data: {
               first_name: firstName.trim(),
               last_name: lastName.trim(),
+              department_id: selectedDepartment
             }
           }
         });
@@ -171,6 +205,7 @@ const Auth = () => {
           setPassword("");
           setFirstName("");
           setLastName("");
+          setSelectedDepartment("");
         }
       }
     } catch (error) {
@@ -191,6 +226,7 @@ const Auth = () => {
     setPassword("");
     setFirstName("");
     setLastName("");
+    setSelectedDepartment("");
   };
 
   return (
@@ -210,40 +246,61 @@ const Auth = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <div className="relative">
-                    <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                    <Input
-                      id="firstName"
-                      type="text"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="pl-10"
-                      required={!isLogin}
-                      disabled={loading}
-                    />
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <div className="relative">
+                      <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                      <Input
+                        id="firstName"
+                        type="text"
+                        placeholder="John"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="pl-10"
+                        required={!isLogin}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <div className="relative">
+                      <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder="Doe"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="pl-10"
+                        required={!isLogin}
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Label htmlFor="department">Department *</Label>
                   <div className="relative">
-                    <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                    <Input
-                      id="lastName"
-                      type="text"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="pl-10"
-                      required={!isLogin}
-                      disabled={loading}
-                    />
+                    <Building className="w-4 h-4 absolute left-3 top-3 text-gray-400 z-10" />
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={loading}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Select your department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </div>
+              </>
             )}
 
             <div className="space-y-2">

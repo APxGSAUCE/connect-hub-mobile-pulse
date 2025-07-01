@@ -1,250 +1,230 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
-import { Plus, MessageSquare, Send, Search, Filter, CheckCheck, Paperclip, File, Download, X, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Plus, MessageSquare, Send, Search, Users, User, 
+  Loader2, ArrowLeft, MoreVertical, UserPlus
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ChatGroup {
+  id: string;
+  name: string;
+  description: string;
+  group_type: 'direct' | 'group' | 'department';
+  created_by: string;
+  created_at: string;
+  members?: GroupMember[];
+  last_message?: Message;
+  unread_count?: number;
+}
+
+interface GroupMember {
+  id: string;
+  user_id: string;
+  role: 'admin' | 'member';
+  profile: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
 
 interface Message {
   id: string;
-  subject: string;
   content: string;
-  sender: string;
-  recipient: string;
-  timestamp: string;
-  isRead: boolean;
-  priority: 'low' | 'medium' | 'high';
-  thread?: string;
-  attachments?: FileAttachment[];
+  sender_id: string;
+  message_type: 'text' | 'file' | 'image';
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  created_at: string;
+  sender?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
 }
 
-interface FileAttachment {
+interface Employee {
   id: string;
-  name: string;
-  size: string;
-  type: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  status: string;
 }
 
 const MessageCenter = () => {
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<'inbox' | 'sent' | 'compose'>('inbox');
-  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
+  const [activeView, setActiveView] = useState<'groups' | 'chat' | 'new-group'>('groups');
+  const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
+  const [activeGroup, setActiveGroup] = useState<ChatGroup | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [messageContent, setMessageContent] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      subject: 'Project Update Required',
-      content: 'Hi team, please provide an update on your current project status by end of day. We need to ensure all deliverables are on track.',
-      sender: 'Sarah Johnson',
-      recipient: 'John Doe',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-      isRead: false,
-      priority: 'high',
-      thread: 'thread-1',
-      attachments: [
-        { id: '1', name: 'project_requirements.pdf', size: '2.5 MB', type: 'application/pdf' }
-      ]
-    },
-    {
-      id: '2',
-      subject: 'Meeting Rescheduled',
-      content: 'The client meeting has been moved to tomorrow at 2 PM. Please update your calendars accordingly and prepare the presentation materials.',
-      sender: 'Mike Wilson',
-      recipient: 'John Doe',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-      isRead: true,
-      priority: 'medium',
-      thread: 'thread-2'
-    },
-    {
-      id: '3',
-      subject: 'Welcome to the Team!',
-      content: 'We are excited to have you join our team. Here is some important information to get you started with your onboarding process.',
-      sender: 'HR Department',
-      recipient: 'John Doe',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-      isRead: true,
-      priority: 'low',
-      thread: 'thread-3',
-      attachments: [
-        { id: '2', name: 'employee_handbook.pdf', size: '1.8 MB', type: 'application/pdf' },
-        { id: '3', name: 'benefits_overview.docx', size: '892 KB', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
-      ]
+  // New group creation state
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [newGroupType, setNewGroupType] = useState<'group' | 'department'>('group');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      fetchChatGroups();
+      fetchEmployees();
+      setupRealtimeSubscription();
     }
-  ]);
+  }, [user]);
 
-  const [newMessage, setNewMessage] = useState({
-    recipient: '',
-    subject: '',
-    content: '',
-    priority: 'medium' as const,
-    attachments: [] as File[]
-  });
+  const setupRealtimeSubscription = () => {
+    if (!user) return;
 
-  const validateMessage = () => {
-    if (!newMessage.recipient.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a recipient.",
-        variant: "destructive"
-      });
-      return false;
-    }
+    const channel = supabase
+      .channel('messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          const newMessage = payload.new as Message;
+          // Only add message if it's for the current active group
+          if (activeGroup && newMessage.group_id === activeGroup.id) {
+            setMessages(prev => [...prev, newMessage]);
+          }
+          // Refresh groups to update last message and unread counts
+          fetchChatGroups();
+        }
+      )
+      .subscribe();
 
-    if (!newMessage.subject.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a subject.",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    if (!newMessage.content.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a message.",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    return true;
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const fetchChatGroups = async () => {
+    if (!user) return;
 
-    setUploadingFiles(true);
-    
     try {
-      // Validate file sizes and types
-      const maxFileSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-        'image/jpeg',
-        'image/png',
-        'image/gif'
-      ];
+      const { data, error } = await supabase
+        .from('chat_group_members')
+        .select(`
+          group_id,
+          chat_groups!inner (
+            id,
+            name,
+            description,
+            group_type,
+            created_by,
+            created_at
+          )
+        `)
+        .eq('user_id', user.id);
 
-      const validFiles: File[] = [];
-      
-      for (const file of Array.from(files)) {
-        if (file.size > maxFileSize) {
-          toast({
-            title: "File Too Large",
-            description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
-            variant: "destructive"
-          });
-          continue;
-        }
+      if (error) throw error;
 
-        if (!allowedTypes.includes(file.type)) {
-          toast({
-            title: "File Type Not Allowed",
-            description: `${file.name} has an unsupported file type.`,
-            variant: "destructive"
-          });
-          continue;
-        }
-
-        validFiles.push(file);
-      }
-
-      if (validFiles.length > 0) {
-        setNewMessage({
-          ...newMessage,
-          attachments: [...newMessage.attachments, ...validFiles]
-        });
-
-        toast({
-          title: "Files Added",
-          description: `${validFiles.length} file(s) added successfully.`,
-        });
-      }
+      const groups = data?.map(item => item.chat_groups).filter(Boolean) || [];
+      setChatGroups(groups);
     } catch (error) {
-      console.error('File upload error:', error);
+      console.error('Error fetching chat groups:', error);
       toast({
-        title: "Upload Error",
-        description: "Failed to add files. Please try again.",
+        title: "Error",
+        description: "Failed to load chat groups.",
         variant: "destructive"
       });
     } finally {
-      setUploadingFiles(false);
-      // Reset file input
-      event.target.value = '';
+      setLoading(false);
     }
   };
 
-  const removeAttachment = (index: number) => {
-    const updatedAttachments = newMessage.attachments.filter((_, i) => i !== index);
-    setNewMessage({ ...newMessage, attachments: updatedAttachments });
-    
-    toast({
-      title: "File Removed",
-      description: "Attachment has been removed.",
-    });
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, status')
+        .eq('status', 'active')
+        .neq('id', user?.id);
+
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
   };
 
-  const handleSendMessage = async () => {
-    if (!validateMessage()) return;
+  const fetchMessages = async (groupId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:profiles!inner (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load messages.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openChat = async (group: ChatGroup) => {
+    setActiveGroup(group);
+    setActiveView('chat');
+    await fetchMessages(group.id);
+  };
+
+  const sendMessage = async () => {
+    if (!messageContent.trim() || !activeGroup || !user) return;
 
     setSendingMessage(true);
-
     try {
-      // Simulate sending delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          group_id: activeGroup.id,
+          sender_id: user.id,
+          content: messageContent.trim(),
+          message_type: 'text'
+        });
 
-      const attachments = newMessage.attachments.map((file, index) => ({
-        id: `att-${Date.now()}-${index}`,
-        name: file.name,
-        size: formatFileSize(file.size),
-        type: file.type
-      }));
+      if (error) throw error;
 
-      const message: Message = {
-        id: Date.now().toString(),
-        subject: newMessage.subject.trim(),
-        content: newMessage.content.trim(),
-        recipient: newMessage.recipient.trim(),
-        priority: newMessage.priority,
-        sender: 'John Doe', // Current user
-        timestamp: new Date().toISOString(),
-        isRead: true,
-        thread: `thread-${Date.now()}`,
-        attachments: attachments.length > 0 ? attachments : undefined
-      };
-
-      setMessages([message, ...messages]);
-      setNewMessage({
-        recipient: '',
-        subject: '',
-        content: '',
-        priority: 'medium',
-        attachments: []
-      });
-      setActiveView('sent');
-
-      toast({
-        title: "Message Sent",
-        description: "Your message has been sent successfully!",
-      });
+      setMessageContent('');
+      // Message will be added via realtime subscription
     } catch (error) {
-      console.error('Send message error:', error);
+      console.error('Error sending message:', error);
       toast({
-        title: "Send Failed",
-        description: "Failed to send message. Please try again.",
+        title: "Error",
+        description: "Failed to send message.",
         variant: "destructive"
       });
     } finally {
@@ -252,431 +232,450 @@ const MessageCenter = () => {
     }
   };
 
-  const handleDownloadAttachment = (attachment: FileAttachment) => {
-    // Simulate download
-    toast({
-      title: "Download Started",
-      description: `Downloading ${attachment.name}...`,
-    });
-    
-    // In a real app, this would trigger the actual download
-    setTimeout(() => {
-      toast({
-        title: "Download Complete",
-        description: `${attachment.name} has been downloaded.`,
+  const createDirectMessage = async (employeeId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('create_direct_message_group', {
+        other_user_id: employeeId
       });
-    }, 2000);
-  };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+      if (error) throw error;
 
-  const markAsRead = (messageId: string) => {
-    setMessages(messages.map(msg => 
-      msg.id === messageId ? { ...msg, isRead: true } : msg
-    ));
-  };
+      toast({
+        title: "Success",
+        description: "Direct message conversation created.",
+      });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      // Refresh groups and open the new chat
+      await fetchChatGroups();
+      
+      // Find and open the newly created group
+      const { data: newGroup, error: groupError } = await supabase
+        .from('chat_groups')
+        .select('*')
+        .eq('id', data)
+        .single();
+
+      if (!groupError && newGroup) {
+        openChat(newGroup);
+      }
+    } catch (error) {
+      console.error('Error creating direct message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create direct message.",
+        variant: "destructive"
+      });
     }
+  };
+
+  const createGroup = async () => {
+    if (!newGroupName.trim() || selectedMembers.length === 0 || !user) return;
+
+    setLoading(true);
+    try {
+      // Create the group
+      const { data: group, error: groupError } = await supabase
+        .from('chat_groups')
+        .insert({
+          name: newGroupName.trim(),
+          description: newGroupDescription.trim(),
+          group_type: newGroupType,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (groupError) throw groupError;
+
+      // Add creator as admin
+      const { error: creatorError } = await supabase
+        .from('chat_group_members')
+        .insert({
+          group_id: group.id,
+          user_id: user.id,
+          role: 'admin'
+        });
+
+      if (creatorError) throw creatorError;
+
+      // Add selected members
+      const memberInserts = selectedMembers.map(memberId => ({
+        group_id: group.id,
+        user_id: memberId,
+        role: 'member'
+      }));
+
+      const { error: membersError } = await supabase
+        .from('chat_group_members')
+        .insert(memberInserts);
+
+      if (membersError) throw membersError;
+
+      toast({
+        title: "Success",
+        description: "Group created successfully!",
+      });
+
+      // Reset form and refresh
+      setNewGroupName('');
+      setNewGroupDescription('');
+      setSelectedMembers([]);
+      setActiveView('groups');
+      await fetchChatGroups();
+
+    } catch (error) {
+      console.error('Error creating group:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create group.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 3600);
-
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      return diffInMinutes <= 1 ? 'Just now' : `${diffInMinutes}m ago`;
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}h ago`;
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      });
-    }
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
+  const filteredEmployees = employees.filter(emp =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const inboxMessages = messages.filter(msg => msg.recipient === 'John Doe');
-  const sentMessages = messages.filter(msg => msg.sender === 'John Doe');
-  const unreadCount = inboxMessages.filter(msg => !msg.isRead).length;
-
-  const filteredMessages = (activeView === 'inbox' ? inboxMessages : sentMessages)
-    .filter(msg => 
-      msg.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.recipient.toLowerCase().includes(searchTerm.toLowerCase())
+  if (loading && activeView === 'groups') {
+    return (
+      <div className="space-y-6 pb-20 md:pb-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      </div>
     );
+  }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Message Center</h2>
-          <p className="text-gray-600">Team communication with file sharing</p>
-        </div>
+      {activeView === 'groups' && (
+        <>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
+              <p className="text-gray-600">Connect with your team</p>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={() => setActiveView('new-group')}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Group
+              </Button>
+            </div>
+          </div>
 
-        <Button onClick={() => setActiveView('compose')} disabled={sendingMessage}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Message
-        </Button>
-      </div>
-
-      {/* Message Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <MessageSquare className="w-6 h-6 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{inboxMessages.length}</p>
-                <p className="text-sm text-gray-600">Total Messages</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xs font-bold">
-                {unreadCount}
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{unreadCount}</p>
-                <p className="text-sm text-gray-600">Unread</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Send className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">{sentMessages.length}</p>
-                <p className="text-sm text-gray-600">Sent</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Paperclip className="w-6 h-6 text-purple-600" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {messages.reduce((acc, msg) => acc + (msg.attachments?.length || 0), 0)}
-                </p>
-                <p className="text-sm text-gray-600">Files Shared</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-        {[
-          { key: 'inbox', label: 'Inbox', count: unreadCount },
-          { key: 'sent', label: 'Sent', count: sentMessages.length },
-          { key: 'compose', label: 'Compose', count: null }
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveView(tab.key as any)}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-md transition-colors ${
-              activeView === tab.key
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-            disabled={sendingMessage}
-          >
-            <span>{tab.label}</span>
-            {tab.count !== null && tab.count > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {tab.count}
-              </Badge>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Content Area */}
-      {activeView === 'compose' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Compose New Message</CardTitle>
-            <CardDescription>Send a message with file attachments to your team members</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="recipient">To *</Label>
-              <Input
-                id="recipient"
-                placeholder="Enter recipient name"
-                value={newMessage.recipient}
-                onChange={(e) => setNewMessage({ ...newMessage, recipient: e.target.value })}
-                disabled={sendingMessage}
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="subject">Subject *</Label>
-              <Input
-                id="subject"
-                placeholder="Enter message subject"
-                value={newMessage.subject}
-                onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
-                disabled={sendingMessage}
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="content">Message *</Label>
-              <Textarea
-                id="content"
-                placeholder="Type your message here..."
-                rows={6}
-                value={newMessage.content}
-                onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
-                disabled={sendingMessage}
-              />
-            </div>
-            
-            {/* File Upload Section */}
-            <div className="grid gap-2">
-              <Label htmlFor="attachments">Attachments</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="attachments"
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="flex-1"
-                  disabled={sendingMessage || uploadingFiles}
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  disabled={sendingMessage || uploadingFiles}
-                >
-                  {uploadingFiles ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Paperclip className="w-4 h-4 mr-2" />
-                  )}
-                  Add Files
-                </Button>
-              </div>
-              
-              {/* Show attached files */}
-              {newMessage.attachments.length > 0 && (
-                <div className="space-y-2 mt-2">
-                  <p className="text-sm font-medium text-gray-700">Attached Files:</p>
-                  {newMessage.attachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
-                      <div className="flex items-center space-x-2">
-                        <File className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-gray-700 truncate max-w-xs">{file.name}</span>
-                        <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Start a Conversation</CardTitle>
+              <CardDescription>Send a direct message to any team member</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                  <Input
+                    placeholder="Search employees..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                {searchTerm && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {filteredEmployees.map((employee) => (
+                      <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback className="bg-blue-100 text-blue-600 text-sm">
+                              {getInitials(employee.first_name, employee.last_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm">{employee.first_name} {employee.last_name}</p>
+                            <p className="text-xs text-gray-500">{employee.email}</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          onClick={() => createDirectMessage(employee.id)}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-1" />
+                          Message
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAttachment(index)}
-                        className="h-6 w-6 p-0 hover:bg-red-100"
-                        disabled={sendingMessage}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                    ))}
+                    {filteredEmployees.length === 0 && (
+                      <p className="text-center text-gray-500 py-4">No employees found</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chat Groups */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Conversations</CardTitle>
+              <CardDescription>Recent group chats and direct messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {chatGroups.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No conversations yet</h3>
+                  <p className="text-gray-600 mb-4">Start chatting with your team members</p>
+                  <Button onClick={() => setActiveView('new-group')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Group
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {chatGroups.map((group) => (
+                    <div 
+                      key={group.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => openChat(group)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="bg-blue-100 text-blue-600">
+                            {group.group_type === 'direct' ? <User className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-medium text-gray-900">{group.name}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {group.group_type}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{group.description || 'No description'}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">
+                          {new Date(group.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
-            <div className="flex justify-between items-center pt-4">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="priority">Priority:</Label>
-                <select
-                  id="priority"
-                  value={newMessage.priority}
-                  onChange={(e) => setNewMessage({ ...newMessage, priority: e.target.value as any })}
-                  className="px-3 py-1 border rounded-md bg-white disabled:bg-gray-100"
-                  disabled={sendingMessage}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
+      {activeView === 'new-group' && (
+        <>
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => setActiveView('groups')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Create New Group</h2>
+              <p className="text-gray-600">Set up a new group conversation</p>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Group Details</CardTitle>
+              <CardDescription>Configure your new group settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="groupName">Group Name *</Label>
+                <Input
+                  id="groupName"
+                  placeholder="Enter group name"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                />
               </div>
-              <Button onClick={handleSendMessage} disabled={sendingMessage}>
-                {sendingMessage ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Message
-                  </>
-                )}
+
+              <div className="space-y-2">
+                <Label htmlFor="groupDescription">Description</Label>
+                <Textarea
+                  id="groupDescription"
+                  placeholder="Optional group description"
+                  value={newGroupDescription}
+                  onChange={(e) => setNewGroupDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="groupType">Group Type</Label>
+                <Select value={newGroupType} onValueChange={(value: 'group' | 'department') => setNewGroupType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="group">General Group</SelectItem>
+                    <SelectItem value="department">Department Group</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Add Members *</Label>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2">
+                  {employees.map((employee) => (
+                    <div key={employee.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`member-${employee.id}`}
+                        checked={selectedMembers.includes(employee.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMembers([...selectedMembers, employee.id]);
+                          } else {
+                            setSelectedMembers(selectedMembers.filter(id => id !== employee.id));
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor={`member-${employee.id}`} className="flex items-center space-x-2 flex-1 cursor-pointer">
+                        <Avatar className="w-6 h-6">
+                          <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+                            {getInitials(employee.first_name, employee.last_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{employee.first_name} {employee.last_name}</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Selected: {selectedMembers.length} members
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button variant="outline" onClick={() => setActiveView('groups')}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={createGroup} 
+                  disabled={!newGroupName.trim() || selectedMembers.length === 0 || loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Create Group
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {activeView === 'chat' && activeGroup && (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => setActiveView('groups')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
               </Button>
+              <div className="flex items-center space-x-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-blue-100 text-blue-600">
+                    {activeGroup.group_type === 'direct' ? <User className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{activeGroup.name}</h2>
+                  <p className="text-sm text-gray-600">{activeGroup.description}</p>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {/* Search and Filter */}
-          <div className="flex space-x-4">
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-              <Input
-                placeholder="Search messages..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Message List */}
-          <div className="space-y-3">
-            {filteredMessages.map((message) => (
-              <Card
-                key={message.id}
-                className={`hover:shadow-md transition-shadow cursor-pointer ${
-                  !message.isRead && activeView === 'inbox' ? 'border-blue-200 bg-blue-50/50' : ''
-                }`}
-                onClick={() => {
-                  if (activeView === 'inbox' && !message.isRead) {
-                    markAsRead(message.id);
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-4">
-                    <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {getInitials(activeView === 'inbox' ? message.sender : message.recipient)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <p className={`text-sm font-medium truncate ${!message.isRead && activeView === 'inbox' ? 'font-semibold' : ''}`}>
-                            {activeView === 'inbox' ? message.sender : message.recipient}
-                          </p>
-                          {!message.isRead && activeView === 'inbox' && (
-                            <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
-                          )}
-                          {message.attachments && message.attachments.length > 0 && (
-                            <Paperclip className="w-3 h-3 text-gray-500 flex-shrink-0" />
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2 flex-shrink-0">
-                          <Badge className={`${getPriorityColor(message.priority)} text-xs`} variant="secondary">
-                            {message.priority}
-                          </Badge>
-                          <span className="text-xs text-gray-500">
-                            {formatTime(message.timestamp)}
-                          </span>
-                          {activeView === 'sent' && (
-                            <CheckCheck className="w-4 h-4 text-green-600" />
-                          )}
-                        </div>
-                      </div>
-                      
-                      <p className={`text-sm text-gray-900 mb-1 ${!message.isRead && activeView === 'inbox' ? 'font-medium' : ''}`}>
-                        {message.subject}
-                      </p>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {message.content}
-                      </p>
-                      
-                      {/* Show attachments */}
-                      {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {message.attachments.map((attachment) => (
-                            <div key={attachment.id} className="flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                              <File className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{attachment.name}</span>
-                              <span className="flex-shrink-0">({attachment.size})</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs ml-auto"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownloadAttachment(attachment);
-                                }}
-                              >
-                                <Download className="w-3 h-3 mr-1" />
-                                Download
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+          <Card className="h-96 flex flex-col">
+            <CardContent className="flex-1 p-4 overflow-y-auto">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                      message.sender_id === user?.id 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-900'
+                    }`}>
+                      {message.sender_id !== user?.id && (
+                        <p className="text-xs font-medium mb-1">
+                          {message.sender?.first_name} {message.sender?.last_name}
+                        </p>
                       )}
+                      <p className="text-sm">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.sender_id === user?.id ? 'text-blue-200' : 'text-gray-500'
+                      }`}>
+                        {formatTime(message.created_at)}
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {filteredMessages.length === 0 && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {searchTerm ? 'No messages found' : `No ${activeView} messages`}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {searchTerm 
-                      ? 'Try adjusting your search terms'
-                      : activeView === 'inbox' 
-                        ? "You're all caught up!" 
-                        : 'Send your first message to get started'
-                    }
-                  </p>
-                  {!searchTerm && activeView === 'inbox' && (
-                    <Button onClick={() => setActiveView('compose')}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Send Message
-                    </Button>
+                ))}
+                {messages.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p>No messages yet. Start the conversation!</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            
+            <div className="border-t p-4">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Type your message..."
+                  value={messageContent}
+                  onChange={(e) => setMessageContent(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  className="flex-1"
+                />
+                <Button onClick={sendMessage} disabled={sendingMessage || !messageContent.trim()}>
+                  {sendingMessage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
                   )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </>
       )}
     </div>
   );
