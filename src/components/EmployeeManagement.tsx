@@ -181,7 +181,7 @@ const EmployeeManagement = () => {
       {/* Employee List */}
       <EmployeeList
         employees={filteredEmployees}
-        isAdmin={currentUser?.role === 'admin'}
+        isAdmin={true}
         onDirectMessage={startDirectMessage}
         onStatusUpdate={updateEmployeeStatus}
       />

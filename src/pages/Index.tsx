@@ -62,13 +62,21 @@ const Index = () => {
     try {
       setLoading(true);
 
-      // Fetch dashboard stats using individual queries for better reliability
+      // Use simplified queries for better compatibility
       const [messagesResult, employeesResult, eventsResult, notificationsResult] = await Promise.all([
-        // Get total messages for user's groups
+        // Get total messages from groups where user is a member
         supabase
-          .from('messages')
-          .select('id, group_id!inner(chat_group_members!inner(user_id))')
-          .eq('group_id.chat_group_members.user_id', user.id),
+          .from('chat_group_members')
+          .select('group_id')
+          .eq('user_id', user.id)
+          .then(async ({ data: groupData }) => {
+            if (!groupData || groupData.length === 0) return { data: [] };
+            const groupIds = groupData.map(g => g.group_id);
+            return supabase
+              .from('messages')
+              .select('id')
+              .in('group_id', groupIds);
+          }),
         
         // Get active employees
         supabase
@@ -91,15 +99,25 @@ const Index = () => {
       ]);
 
       // Get unread messages count
-      const { data: unreadMessages } = await supabase
-        .from('messages')
-        .select('id, sender_id, group_id!inner(chat_group_members!inner(user_id))')
-        .eq('group_id.chat_group_members.user_id', user.id)
-        .neq('sender_id', user.id);
+      const { data: groupMemberships } = await supabase
+        .from('chat_group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+
+      let unreadCount = 0;
+      if (groupMemberships && groupMemberships.length > 0) {
+        const groupIds = groupMemberships.map(g => g.group_id);
+        const { data: unreadMessages } = await supabase
+          .from('messages')
+          .select('id')
+          .in('group_id', groupIds)
+          .neq('sender_id', user.id);
+        unreadCount = unreadMessages?.length || 0;
+      }
 
       setStats({
-        total_messages: messagesResult.data?.length || 0,
-        unread_messages: unreadMessages?.length || 0,
+        total_messages: (await messagesResult).data?.length || 0,
+        unread_messages: unreadCount,
         upcoming_events: eventsResult.data?.length || 0,
         total_employees: employeesResult.data?.length || 0,
         unread_notifications: notificationsResult.data?.length || 0
