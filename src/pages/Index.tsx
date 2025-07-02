@@ -202,7 +202,9 @@ const Index = () => {
   }
 
   if (!user) {
-    return null; // Will be handled by the route protection in App.tsx
+    // Redirect to auth page if not authenticated
+    window.location.href = '/auth';
+    return null;
   }
 
   return (
