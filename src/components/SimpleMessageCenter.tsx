@@ -1,14 +1,12 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { 
   Plus, MessageSquare, Send, Search, Users, User, 
-  Loader2, ArrowLeft, Paperclip, File, Download
+  Loader2, ArrowLeft, Paperclip, File, Download, X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,6 +50,7 @@ const SimpleMessageCenter = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState<'groups' | 'chat' | 'new-group'>('groups');
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<ChatGroup | null>(null);
@@ -63,6 +62,7 @@ const SimpleMessageCenter = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -71,6 +71,14 @@ const SimpleMessageCenter = () => {
       setupRealtimeSubscription();
     }
   }, [user]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const setupRealtimeSubscription = () => {
     if (!user) return;
@@ -87,7 +95,7 @@ const SimpleMessageCenter = () => {
         (payload) => {
           const newMessage = payload.new as Message;
           if (activeGroup && newMessage.group_id === activeGroup.id) {
-            setMessages(prev => [...prev, newMessage]);
+            fetchMessages(activeGroup.id);
           }
         }
       )
@@ -211,6 +219,7 @@ const SimpleMessageCenter = () => {
       if (error) throw error;
 
       setMessageContent('');
+      await fetchMessages(activeGroup.id);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -227,7 +236,7 @@ const SimpleMessageCenter = () => {
     const file = event.target.files?.[0];
     if (!file || !activeGroup || !user) return;
 
-    setSendingMessage(true);
+    setUploadingFile(true);
     try {
       // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop();
@@ -260,6 +269,7 @@ const SimpleMessageCenter = () => {
 
       if (error) throw error;
 
+      await fetchMessages(activeGroup.id);
       toast({
         title: "Success",
         description: "File uploaded successfully!",
@@ -272,7 +282,7 @@ const SimpleMessageCenter = () => {
         variant: "destructive"
       });
     } finally {
-      setSendingMessage(false);
+      setUploadingFile(false);
       if (event.target) {
         event.target.value = '';
       }
@@ -428,24 +438,22 @@ const SimpleMessageCenter = () => {
 
   if (loading && activeView === 'groups') {
     return (
-      <div className="space-y-6 pb-20 md:pb-6">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6">
+    <div className="h-full flex flex-col">
       {activeView === 'groups' && (
-        <>
-          <div className="flex justify-between items-center">
+        <div className="space-y-4 flex-1 overflow-hidden">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
-              <p className="text-gray-600">Connect with your team</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Messages</h2>
+              <p className="text-sm text-gray-600">Connect with your team</p>
             </div>
-            <Button onClick={() => setActiveView('new-group')}>
+            <Button onClick={() => setActiveView('new-group')} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               New Group
             </Button>
@@ -453,58 +461,57 @@ const SimpleMessageCenter = () => {
 
           {/* Quick Direct Message */}
           <Card>
-            <CardHeader>
-              <CardTitle>Start a Direct Message</CardTitle>
-              <CardDescription>Send a message to any team member</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Start a Direct Message</CardTitle>
+              <CardDescription className="text-sm">Send a message to any team member</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                  <Input
-                    placeholder="Search employees..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                {searchTerm && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {filteredEmployees.map((employee) => (
-                      <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="bg-blue-100 text-blue-600 text-sm">
-                              {getInitials(employee.first_name, employee.last_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-sm">{employee.first_name} {employee.last_name}</p>
-                            <p className="text-xs text-gray-500">{employee.email}</p>
-                          </div>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          onClick={() => createDirectMessage(employee.id, `${employee.first_name} ${employee.last_name}`)}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-1" />
-                          Message
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                <Input
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
+              
+              {searchTerm && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {filteredEmployees.map((employee) => (
+                    <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <Avatar className="w-8 h-8 flex-shrink-0">
+                          <AvatarFallback className="bg-blue-100 text-blue-600 text-sm">
+                            {getInitials(employee.first_name, employee.last_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{employee.first_name} {employee.last_name}</p>
+                          <p className="text-xs text-gray-500 truncate">{employee.email}</p>
+                        </div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => createDirectMessage(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                        className="ml-2 flex-shrink-0"
+                      >
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        <span className="hidden sm:inline">Chat</span>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Chat Groups */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Conversations</CardTitle>
+          <Card className="flex-1 flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Your Conversations</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-y-auto">
               {chatGroups.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -515,18 +522,18 @@ const SimpleMessageCenter = () => {
                   {chatGroups.map((group) => (
                     <div 
                       key={group.id} 
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                       onClick={() => openChat(group)}
                     >
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="w-10 h-10">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <Avatar className="w-10 h-10 flex-shrink-0">
                           <AvatarFallback className="bg-blue-100 text-blue-600">
                             {group.group_type === 'direct' ? <User className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <h4 className="font-medium text-gray-900">{group.name}</h4>
-                          <p className="text-sm text-gray-600">{group.description || 'No description'}</p>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 truncate">{group.name}</h4>
+                          <p className="text-sm text-gray-600 truncate">{group.description || 'No description'}</p>
                         </div>
                       </div>
                     </div>
@@ -535,18 +542,18 @@ const SimpleMessageCenter = () => {
               )}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
 
       {activeView === 'new-group' && (
-        <>
+        <div className="space-y-4">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => setActiveView('groups')}>
+            <Button variant="ghost" onClick={() => setActiveView('groups')} size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Create New Group</h2>
+              <h2 className="text-xl font-bold text-gray-900">Create New Group</h2>
             </div>
           </div>
 
@@ -582,7 +589,7 @@ const SimpleMessageCenter = () => {
                           }
                         }}
                       />
-                      <label htmlFor={`member-${employee.id}`} className="flex items-center space-x-2 flex-1">
+                      <label htmlFor={`member-${employee.id}`} className="flex items-center space-x-2 flex-1 cursor-pointer">
                         <Avatar className="w-6 h-6">
                           <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
                             {getInitials(employee.first_name, employee.last_name)}
@@ -595,65 +602,66 @@ const SimpleMessageCenter = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setActiveView('groups')}>
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button variant="outline" onClick={() => setActiveView('groups')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
                 <Button 
                   onClick={createGroup} 
                   disabled={!newGroupName.trim() || selectedMembers.length === 0}
+                  className="w-full sm:w-auto"
                 >
                   Create Group
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
 
       {activeView === 'chat' && activeGroup && (
-        <>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => setActiveView('groups')}>
+        <div className="flex flex-col h-full">
+          <div className="flex items-center space-x-4 mb-4">
+            <Button variant="ghost" onClick={() => setActiveView('groups')} size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <div className="flex items-center space-x-3">
-              <Avatar className="w-10 h-10">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              <Avatar className="w-10 h-10 flex-shrink-0">
                 <AvatarFallback className="bg-blue-100 text-blue-600">
                   {activeGroup.group_type === 'direct' ? <User className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{activeGroup.name}</h2>
-                <p className="text-sm text-gray-600">{activeGroup.description}</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-bold text-gray-900 truncate">{activeGroup.name}</h2>
+                <p className="text-sm text-gray-600 truncate">{activeGroup.description}</p>
               </div>
             </div>
           </div>
 
-          <Card className="h-96 flex flex-col">
-            <CardContent className="flex-1 p-4 overflow-y-auto">
+          <Card className="flex-1 flex flex-col min-h-0">
+            <CardContent className="flex-1 p-4 overflow-y-auto min-h-0">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div key={message.id} className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    <div className={`max-w-[80%] sm:max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                       message.sender_id === user?.id 
                         ? 'bg-blue-600 text-white' 
                         : 'bg-gray-100 text-gray-900'
                     }`}>
                       {message.sender_id !== user?.id && message.sender && (
-                        <p className="text-xs font-medium mb-1">
+                        <p className="text-xs font-medium mb-1 opacity-75">
                           {message.sender.first_name} {message.sender.last_name}
                         </p>
                       )}
                       
                       {message.message_type === 'text' && (
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm break-words">{message.content}</p>
                       )}
                       
                       {(message.message_type === 'file' || message.message_type === 'image') && (
                         <div className="space-y-2">
-                          <p className="text-sm">{message.content}</p>
+                          <p className="text-sm break-words">{message.content}</p>
                           {message.message_type === 'image' && message.file_url && (
                             <img 
                               src={message.file_url} 
@@ -663,16 +671,16 @@ const SimpleMessageCenter = () => {
                           )}
                           {message.file_name && (
                             <div className="flex items-center space-x-2 text-xs">
-                              <File className="w-3 h-3" />
-                              <span>{message.file_name}</span>
+                              <File className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{message.file_name}</span>
                               {message.file_size && (
-                                <span>({formatFileSize(message.file_size)})</span>
+                                <span className="flex-shrink-0">({formatFileSize(message.file_size)})</span>
                               )}
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => message.file_url && downloadFile(message.file_url, message.file_name || 'file')}
-                                className="h-auto p-1"
+                                className="h-auto p-1 flex-shrink-0"
                               >
                                 <Download className="w-3 h-3" />
                               </Button>
@@ -689,6 +697,7 @@ const SimpleMessageCenter = () => {
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             </CardContent>
             
@@ -704,9 +713,14 @@ const SimpleMessageCenter = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={sendingMessage}
+                  disabled={uploadingFile}
+                  className="flex-shrink-0"
                 >
-                  <Paperclip className="w-4 h-4" />
+                  {uploadingFile ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Paperclip className="w-4 h-4" />
+                  )}
                 </Button>
                 <Input
                   placeholder="Type your message..."
@@ -715,7 +729,11 @@ const SimpleMessageCenter = () => {
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   className="flex-1"
                 />
-                <Button onClick={sendMessage} disabled={sendingMessage || !messageContent.trim()}>
+                <Button 
+                  onClick={sendMessage} 
+                  disabled={sendingMessage || !messageContent.trim()}
+                  className="flex-shrink-0"
+                >
                   {sendingMessage ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
@@ -725,7 +743,7 @@ const SimpleMessageCenter = () => {
               </div>
             </div>
           </Card>
-        </>
+        </div>
       )}
     </div>
   );

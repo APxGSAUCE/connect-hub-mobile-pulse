@@ -1,13 +1,16 @@
 
 {
-  "name": "Employee Connect Hub",
-  "short_name": "ConnectHub",
-  "description": "Mobile employee collaboration and task management",
+  "name": "PGIS Connect Hub",
+  "short_name": "PGIS Connect",
+  "description": "Employee collaboration and communication platform",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "theme_color": "#3b82f6",
   "background_color": "#ffffff",
+  "scope": "/",
+  "lang": "en-US",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -20,6 +23,20 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "Open messages directly",
+      "url": "/?tab=messages",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
