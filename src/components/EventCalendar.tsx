@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,72 +7,128 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Calendar, Clock, MapPin, Users, Video } from "lucide-react";
+import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
 
 interface Event {
   id: string;
   title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  type: 'meeting' | 'training' | 'social' | 'deadline';
-  attendees: string[];
-  isVirtual: boolean;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  location: string | null;
+  event_type: string;
+  created_by: string;
+  created_at: string;
+  participants?: EventParticipant[];
+}
+
+interface EventParticipant {
+  id: string;
+  user_id: string;
+  status: 'invited' | 'accepted' | 'declined' | 'maybe';
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+  };
 }
 
 const EventCalendar = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: '1',
-      title: 'Team Standup Meeting',
-      description: 'Daily sync meeting to discuss project progress and blockers',
-      date: '2024-01-18',
-      time: '09:00',
-      location: 'Conference Room A',
-      type: 'meeting',
-      attendees: ['John Doe', 'Sarah Johnson', 'Mike Wilson'],
-      isVirtual: false
-    },
-    {
-      id: '2',
-      title: 'Product Launch Training',
-      description: 'Training session for the new product features and updates',
-      date: '2024-01-20',
-      time: '14:00',
-      location: 'Virtual Meeting',
-      type: 'training',
-      attendees: ['All Team'],
-      isVirtual: true
-    },
-    {
-      id: '3',
-      title: 'Client Presentation',
-      description: 'Quarterly review presentation to key stakeholders',
-      date: '2024-01-22',
-      time: '10:30',
-      location: 'Boardroom',
-      type: 'meeting',
-      attendees: ['Management Team', 'Client Representatives'],
-      isVirtual: false
-    }
-  ]);
-
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
-    date: '',
-    time: '',
+    start_date: '',
+    end_date: '',
     location: '',
-    type: 'meeting' as const,
-    isVirtual: false
+    event_type: 'meeting'
   });
 
-  const handleCreateEvent = () => {
-    if (!newEvent.title || !newEvent.date || !newEvent.time) {
+  useEffect(() => {
+    if (user) {
+      fetchEvents();
+    }
+  }, [user]);
+
+  // Set up real-time subscription for events
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('events-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events'
+        },
+        () => {
+          console.log('Events changed, refetching...');
+          fetchEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const fetchEvents = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      
+      // Fetch events with participants
+      const { data: eventsData, error } = await supabase
+        .from('events')
+        .select(`
+          *,
+          event_participants!inner (
+            id,
+            user_id,
+            status,
+            profiles (
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
+        .order('start_date', { ascending: true });
+
+      if (error) throw error;
+
+      console.log('Fetched events data:', eventsData);
+      setEvents(eventsData || []);
+
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load events.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateOrUpdateEvent = async () => {
+    if (!user) return;
+
+    if (!newEvent.title || !newEvent.start_date || !newEvent.end_date) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -81,85 +137,215 @@ const EventCalendar = () => {
       return;
     }
 
-    const event: Event = {
-      id: Date.now().toString(),
-      ...newEvent,
-      attendees: []
-    };
+    if (new Date(newEvent.start_date) >= new Date(newEvent.end_date)) {
+      toast({
+        title: "Error", 
+        description: "End date must be after start date",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setEvents([...events, event].sort((a, b) => 
-      new Date(a.date + ' ' + a.time).getTime() - new Date(b.date + ' ' + b.time).getTime()
-    ));
-    
+    try {
+      if (editingEvent) {
+        // Update existing event
+        const { error } = await supabase
+          .from('events')
+          .update({
+            title: newEvent.title,
+            description: newEvent.description || null,
+            start_date: newEvent.start_date,
+            end_date: newEvent.end_date,
+            location: newEvent.location || null,
+            event_type: newEvent.event_type,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingEvent.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Event updated successfully!",
+        });
+        
+        setEditingEvent(null);
+      } else {
+        // Create new event
+        const { data: eventData, error: eventError } = await supabase
+          .from('events')
+          .insert({
+            title: newEvent.title,
+            description: newEvent.description || null,
+            start_date: newEvent.start_date,
+            end_date: newEvent.end_date,
+            location: newEvent.location || null,
+            event_type: newEvent.event_type,
+            created_by: user.id
+          })
+          .select()
+          .single();
+
+        if (eventError) throw eventError;
+
+        // Add creator as participant
+        const { error: participantError } = await supabase
+          .from('event_participants')
+          .insert({
+            event_id: eventData.id,
+            user_id: user.id,
+            status: 'accepted'
+          });
+
+        if (participantError) throw participantError;
+
+        toast({
+          title: "Success",
+          description: "Event created successfully!",
+        });
+      }
+
+      // Reset form
+      setNewEvent({
+        title: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        location: '',
+        event_type: 'meeting'
+      });
+      setIsDialogOpen(false);
+      
+      // Refresh events
+      fetchEvents();
+
+    } catch (error) {
+      console.error('Error creating/updating event:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save event. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!user) return;
+
+    try {
+      // Delete participants first
+      await supabase
+        .from('event_participants')
+        .delete()
+        .eq('event_id', eventId);
+
+      // Delete event
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Event deleted successfully!",
+      });
+
+      fetchEvents();
+
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete event.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setNewEvent({
+      title: event.title,
+      description: event.description || '',
+      start_date: event.start_date.slice(0, 16), // Format for datetime-local input
+      end_date: event.end_date.slice(0, 16),
+      location: event.location || '',
+      event_type: event.event_type
+    });
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingEvent(null);
     setNewEvent({
       title: '',
       description: '',
-      date: '',
-      time: '',
+      start_date: '',
+      end_date: '',
       location: '',
-      type: 'meeting',
-      isVirtual: false
+      event_type: 'meeting'
     });
-    setIsDialogOpen(false);
+  };
 
-    toast({
-      title: "Success",
-      description: "Event created successfully!",
-    });
+  const getEventStatus = (startDate: string, endDate: string) => {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const now = new Date();
+
+    if (isPast(end)) return { status: 'past', color: 'bg-gray-100 text-gray-800' };
+    if (isToday(start) || (start <= now && end >= now)) return { status: 'ongoing', color: 'bg-green-100 text-green-800' };
+    if (isFuture(start)) return { status: 'upcoming', color: 'bg-blue-100 text-blue-800' };
+    return { status: 'unknown', color: 'bg-gray-100 text-gray-800' };
   };
 
   const getEventTypeColor = (type: string) => {
     switch (type) {
       case 'meeting': return 'bg-blue-100 text-blue-800';
-      case 'training': return 'bg-green-100 text-green-800';
-      case 'social': return 'bg-purple-100 text-purple-800';
-      case 'deadline': return 'bg-red-100 text-red-800';
+      case 'workshop': return 'bg-purple-100 text-purple-800';
+      case 'conference': return 'bg-green-100 text-green-800';
+      case 'social': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const isUpcoming = (dateString: string, timeString: string) => {
-    const eventDateTime = new Date(dateString + ' ' + timeString);
-    return eventDateTime > new Date();
-  };
-
-  const upcomingEvents = events.filter(event => isUpcoming(event.date, event.time));
-  const pastEvents = events.filter(event => !isUpcoming(event.date, event.time));
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Event Calendar</h2>
-          <p className="text-gray-600">Schedule and manage team events</p>
+          <h2 className="text-2xl font-bold text-gray-900">Events Calendar</h2>
+          <p className="text-gray-600">Manage and view upcoming events</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               Create Event
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Event</DialogTitle>
+              <DialogTitle>
+                {editingEvent ? 'Edit Event' : 'Create New Event'}
+              </DialogTitle>
               <DialogDescription>
-                Schedule a new event for your team
+                {editingEvent ? 'Update event details' : 'Add a new event to the calendar'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="title">Event Title *</Label>
+                <Label htmlFor="title">Title *</Label>
                 <Input
                   id="title"
                   placeholder="Enter event title"
@@ -167,6 +353,7 @@ const EventCalendar = () => {
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                 />
               </div>
+              
               <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -176,202 +363,159 @@ const EventCalendar = () => {
                   onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="date">Date *</Label>
+                  <Label htmlFor="start_date">Start Date & Time *</Label>
                   <Input
-                    id="date"
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    id="start_date"
+                    type="datetime-local"
+                    value={newEvent.start_date}
+                    onChange={(e) => setNewEvent({ ...newEvent, start_date: e.target.value })}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="time">Time *</Label>
+                  <Label htmlFor="end_date">End Date & Time *</Label>
                   <Input
-                    id="time"
-                    type="time"
-                    value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    id="end_date"
+                    type="datetime-local"
+                    value={newEvent.end_date}
+                    onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
                   />
                 </div>
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
-                  placeholder="Enter location or meeting link"
+                  placeholder="Enter event location"
                   value={newEvent.location}
                   onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isVirtual"
-                  checked={newEvent.isVirtual}
-                  onChange={(e) => setNewEvent({ ...newEvent, isVirtual: e.target.checked })}
-                  className="rounded"
-                />
-                <Label htmlFor="isVirtual">Virtual Event</Label>
+
+              <div className="grid gap-2">
+                <Label htmlFor="event_type">Event Type</Label>
+                <select
+                  id="event_type"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={newEvent.event_type}
+                  onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
+                >
+                  <option value="meeting">Meeting</option>
+                  <option value="workshop">Workshop</option>
+                  <option value="conference">Conference</option>
+                  <option value="social">Social</option>
+                  <option value="training">Training</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
             </div>
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateEvent}>Create Event</Button>
+              <Button onClick={handleCreateOrUpdateEvent}>
+                {editingEvent ? 'Update Event' : 'Create Event'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Event Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-6 h-6 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{upcomingEvents.length}</p>
-                <p className="text-sm text-gray-600">Upcoming</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Video className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">{events.filter(e => e.isVirtual).length}</p>
-                <p className="text-sm text-gray-600">Virtual</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Users className="w-6 h-6 text-purple-600" />
-              <div>
-                <p className="text-2xl font-bold">{events.filter(e => e.type === 'meeting').length}</p>
-                <p className="text-sm text-gray-600">Meetings</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <MapPin className="w-6 h-6 text-orange-600" />
-              <div>
-                <p className="text-2xl font-bold">{events.filter(e => !e.isVirtual).length}</p>
-                <p className="text-sm text-gray-600">In-Person</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Upcoming Events */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Events</h3>
-        <div className="space-y-4">
-          {upcomingEvents.map((event) => (
-            <Card key={event.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col space-y-4">
+      {/* Events List */}
+      <div className="space-y-4">
+        {events.length > 0 ? (
+          events.map((event) => {
+            const eventStatus = getEventStatus(event.start_date, event.end_date);
+            return (
+              <Card key={event.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h4 className="text-lg font-semibold text-gray-900">{event.title}</h4>
-                      <p className="text-gray-600 mt-1">{event.description}</p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Badge className={getEventTypeColor(event.type)}>{event.type}</Badge>
-                      {event.isVirtual && (
-                        <Badge variant="outline">
-                          <Video className="w-3 h-3 mr-1" />
-                          Virtual
-                        </Badge>
+                      <CardTitle className="text-lg">{event.title}</CardTitle>
+                      {event.description && (
+                        <CardDescription className="mt-1">
+                          {event.description}
+                        </CardDescription>
                       )}
                     </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatDate(event.date)}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{event.time}</span>
-                      </div>
-                      {event.location && (
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="w-4 h-4" />
-                          <span>{event.location}</span>
+                    
+                    <div className="flex items-center space-x-2 ml-4">
+                      <Badge className={getEventTypeColor(event.event_type)}>
+                        {event.event_type}
+                      </Badge>
+                      <Badge className={eventStatus.color}>
+                        {eventStatus.status}
+                      </Badge>
+                      
+                      {user && event.created_by === user.id && (
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditEvent(event)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEvent(event.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       )}
                     </div>
-
-                    <Button size="sm" variant="outline">
-                      View Details
-                    </Button>
                   </div>
-
-                  {event.attendees.length > 0 && (
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Users className="w-4 h-4" />
-                      <span>Attendees: {event.attendees.join(', ')}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {upcomingEvents.length === 0 && (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">No upcoming events</h4>
-                <p className="text-gray-600 mb-4">Schedule your first event to get started</p>
-                <Button onClick={() => setIsDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Event
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Past Events */}
-      {pastEvents.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Past Events</h3>
-          <div className="space-y-4">
-            {pastEvents.slice(0, 3).map((event) => (
-              <Card key={event.id} className="opacity-75">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{event.title}</h4>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                        <span>{formatDate(event.date)}</span>
-                        <span>{event.time}</span>
+                </CardHeader>
+                
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center space-x-1">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {format(parseISO(event.start_date), 'MMM dd, yyyy HH:mm')} - {format(parseISO(event.end_date), 'MMM dd, yyyy HH:mm')}
+                        </span>
                       </div>
                     </div>
-                    <Badge variant="secondary">Completed</Badge>
+                    
+                    {event.location && (
+                      <div className="flex items-center space-x-1 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4" />
+                        <span>{event.location}</span>
+                      </div>
+                    )}
+                    
+                    {event.participants && event.participants.length > 0 && (
+                      <div className="flex items-center space-x-1 text-sm text-gray-600">
+                        <Users className="w-4 h-4" />
+                        <span>{event.participants.length} participant(s)</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
-      )}
+            );
+          })
+        ) : (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
+              <p className="text-gray-600 mb-4">Create your first event to get started</p>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Event
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

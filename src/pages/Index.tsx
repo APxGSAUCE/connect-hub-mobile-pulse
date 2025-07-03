@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, MessageSquare, Users, Bell, 
-  TrendingUp, Clock, CheckCircle, AlertCircle, Loader2
+  TrendingUp, Clock, CheckCircle, AlertCircle, Loader2, Menu
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +36,14 @@ interface RecentActivity {
   };
 }
 
+interface RecentEvent {
+  id: string;
+  title: string;
+  start_date: string;
+  event_type: string;
+  location?: string;
+}
+
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
@@ -49,6 +56,7 @@ const Index = () => {
     unread_notifications: 0
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Check URL parameters for tab selection
@@ -66,14 +74,57 @@ const Index = () => {
     }
   }, [user, authLoading]);
 
+  // Set up real-time subscriptions for dashboard updates
+  useEffect(() => {
+    if (!user) return;
+
+    const eventsChannel = supabase
+      .channel('dashboard-events')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events'
+        },
+        () => {
+          console.log('Events changed, updating dashboard...');
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    const messagesChannel = supabase
+      .channel('dashboard-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          console.log('New message, updating dashboard...');
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(eventsChannel);
+      supabase.removeChannel(messagesChannel);
+    };
+  }, [user]);
+
   const fetchDashboardData = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
 
-      // Use simplified queries for better compatibility
-      const [messagesResult, employeesResult, eventsResult, notificationsResult] = await Promise.all([
+      // Fetch comprehensive dashboard data
+      const [messagesResult, employeesResult, eventsResult, notificationsResult, recentEventsResult] = await Promise.all([
+        // Messages count
         supabase
           .from('chat_group_members')
           .select('group_id')
@@ -83,51 +134,56 @@ const Index = () => {
             const groupIds = groupData.map(g => g.group_id);
             return supabase
               .from('messages')
-              .select('id')
+              .select('id, sender_id, created_at')
               .in('group_id', groupIds);
           }),
         
+        // Active employees count
         supabase
           .from('profiles')
           .select('id')
           .eq('status', 'active'),
         
+        // Upcoming events count
         supabase
           .from('events')
           .select('id')
           .gte('start_date', new Date().toISOString()),
         
+        // Unread notifications
         supabase
           .from('notifications')
           .select('id')
           .eq('user_id', user.id)
-          .eq('is_read', false)
+          .eq('is_read', false),
+
+        // Recent events for dashboard display
+        supabase
+          .from('events')
+          .select('id, title, start_date, event_type, location')
+          .gte('start_date', new Date().toISOString())
+          .order('start_date', { ascending: true })
+          .limit(3)
       ]);
 
-      const { data: groupMemberships } = await supabase
-        .from('chat_group_members')
-        .select('group_id')
-        .eq('user_id', user.id);
-
-      let unreadCount = 0;
-      if (groupMemberships && groupMemberships.length > 0) {
-        const groupIds = groupMemberships.map(g => g.group_id);
-        const { data: unreadMessages } = await supabase
-          .from('messages')
-          .select('id')
-          .in('group_id', groupIds)
-          .neq('sender_id', user.id);
-        unreadCount = unreadMessages?.length || 0;
-      }
+      // Calculate unread messages (messages from others)
+      const totalMessages = (await messagesResult).data?.length || 0;
+      const unreadMessages = (await messagesResult).data?.filter(
+        msg => msg.sender_id !== user.id
+      ).length || 0;
 
       setStats({
-        total_messages: (await messagesResult).data?.length || 0,
-        unread_messages: unreadCount,
+        total_messages: totalMessages,
+        unread_messages: unreadMessages,
         upcoming_events: eventsResult.data?.length || 0,
         total_employees: employeesResult.data?.length || 0,
         unread_notifications: notificationsResult.data?.length || 0
       });
 
+      // Set recent events
+      setRecentEvents(recentEventsResult.data || []);
+
+      // Fetch recent notifications for activity feed
       const { data: notifications } = await supabase
         .from('notifications')
         .select('*')
@@ -210,38 +266,41 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
-      {/* Header - Improved mobile responsiveness */}
-      <div className="bg-white shadow-sm border-b flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col safe-area-inset">
+      {/* Header - Enhanced mobile responsiveness */}
+      <div className="bg-white shadow-sm border-b flex-shrink-0 safe-area-inset-top">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-12 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Users className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">PGIS Connect</h1>
+              <h1 className="text-base sm:text-xl font-bold text-gray-900">PGIS Connect</h1>
             </div>
             
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center space-x-1 sm:space-x-4">
               <div className="relative">
-                <Button variant="ghost" size="sm" className="relative p-2">
+                <Button variant="ghost" size="sm" className="relative p-1.5 sm:p-2">
                   <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                   {stats.unread_notifications > 0 && (
-                    <Badge className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 p-0 flex items-center justify-center text-xs">
-                      {stats.unread_notifications}
+                    <Badge className="absolute -top-0.5 -right-0.5 w-3 h-3 sm:w-5 sm:h-5 p-0 flex items-center justify-center text-xs">
+                      {stats.unread_notifications > 9 ? '9+' : stats.unread_notifications}
                     </Badge>
                   )}
                 </Button>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Avatar className="w-7 h-7 sm:w-8 sm:h-8">
-                  <AvatarFallback className="bg-blue-100 text-blue-600 text-xs sm:text-sm">
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
+                  <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
                     {getInitials(user.email || 'User')}
                   </AvatarFallback>
                 </Avatar>
-                <Button variant="ghost" size="sm" onClick={handleSignOut} className="hidden sm:inline-flex">
+                <Button variant="ghost" size="sm" onClick={handleSignOut} className="hidden sm:inline-flex text-sm">
                   Sign Out
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleSignOut} className="sm:hidden p-1">
+                  <Menu className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -249,69 +308,69 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Main Content - Improved layout */}
+      {/* Main Content - Enhanced for mobile */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1 flex flex-col">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-6 lg:py-8 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-5 mb-4 sm:mb-6">
-              <TabsTrigger value="dashboard" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-xs sm:text-sm">Dashboard</span>
+            <TabsList className="grid w-full grid-cols-5 mb-3 sm:mb-6 h-auto">
+              <TabsTrigger value="dashboard" className="flex flex-col items-center space-y-0.5 sm:space-y-1 py-1.5 sm:py-2 text-xs">
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span>Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="messages" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 relative">
-                <MessageSquare className="w-4 h-4" />
-                <span className="text-xs sm:text-sm">Messages</span>
+              <TabsTrigger value="messages" className="flex flex-col items-center space-y-0.5 sm:space-y-1 py-1.5 sm:py-2 text-xs relative">
+                <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span>Messages</span>
                 {stats.unread_messages > 0 && (
-                  <Badge variant="secondary" className="absolute -top-1 -right-1 w-4 h-4 p-0 text-xs">
+                  <Badge variant="secondary" className="absolute -top-0.5 -right-0.5 w-3 h-3 p-0 text-xs flex items-center justify-center">
                     {stats.unread_messages > 9 ? '9+' : stats.unread_messages}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="events" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2">
-                <Calendar className="w-4 h-4" />
-                <span className="text-xs sm:text-sm">Events</span>
+              <TabsTrigger value="events" className="flex flex-col items-center space-y-0.5 sm:space-y-1 py-1.5 sm:py-2 text-xs">
+                <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span>Events</span>
               </TabsTrigger>
-              <TabsTrigger value="employees" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2">
-                <Users className="w-4 h-4" />
-                <span className="text-xs sm:text-sm">Team</span>
+              <TabsTrigger value="employees" className="flex flex-col items-center space-y-0.5 sm:space-y-1 py-1.5 sm:py-2 text-xs">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span>Team</span>
               </TabsTrigger>
-              <TabsTrigger value="profile" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2">
-                <Avatar className="w-4 h-4">
+              <TabsTrigger value="profile" className="flex flex-col items-center space-y-0.5 sm:space-y-1 py-1.5 sm:py-2 text-xs">
+                <Avatar className="w-3 h-3 sm:w-4 sm:h-4">
                   <AvatarFallback className="text-xs">
                     {getInitials(user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-xs sm:text-sm">Profile</span>
+                <span>Profile</span>
               </TabsTrigger>
             </TabsList>
 
             <div className="flex-1 overflow-hidden">
-              <TabsContent value="dashboard" className="space-y-4 sm:space-y-6 h-full overflow-y-auto">
+              <TabsContent value="dashboard" className="space-y-3 sm:space-y-6 h-full overflow-y-auto">
                 {/* Welcome Section */}
-                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6">
+                  <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
                     Welcome back! 👋
                   </h2>
-                  <p className="text-sm sm:text-base text-gray-600">
+                  <p className="text-sm text-gray-600">
                     Here's what's happening in your organization today.
                   </p>
                 </div>
 
-                {/* Stats Cards - Improved mobile layout */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+                {/* Stats Cards - Mobile optimized */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6">
                   <Card className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 sm:p-6">
+                    <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium text-gray-600">Messages</p>
+                          <p className="text-xs font-medium text-gray-600">Messages</p>
                           <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total_messages}</p>
                         </div>
-                        <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center ml-2">
-                          <MessageSquare className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
+                        <div className="w-6 h-6 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center ml-1 sm:ml-2">
+                          <MessageSquare className="w-3 h-3 sm:w-6 sm:h-6 text-blue-600" />
                         </div>
                       </div>
                       {stats.unread_messages > 0 && (
-                        <p className="text-xs sm:text-sm text-blue-600 mt-2">
+                        <p className="text-xs text-blue-600 mt-1 sm:mt-2">
                           {stats.unread_messages} unread
                         </p>
                       )}
@@ -319,78 +378,123 @@ const Index = () => {
                   </Card>
 
                   <Card className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 sm:p-6">
+                    <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium text-gray-600">Events</p>
+                          <p className="text-xs font-medium text-gray-600">Events</p>
                           <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.upcoming_events}</p>
                         </div>
-                        <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center ml-2">
-                          <Calendar className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
+                        <div className="w-6 h-6 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center ml-1 sm:ml-2">
+                          <Calendar className="w-3 h-3 sm:w-6 sm:h-6 text-green-600" />
                         </div>
                       </div>
-                      <p className="text-xs sm:text-sm text-green-600 mt-2">This week</p>
+                      <p className="text-xs text-green-600 mt-1 sm:mt-2">Upcoming</p>
                     </CardContent>
                   </Card>
 
                   <Card className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 sm:p-6">
+                    <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium text-gray-600">Team</p>
+                          <p className="text-xs font-medium text-gray-600">Team</p>
                           <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total_employees}</p>
                         </div>
-                        <div className="w-8 h-8 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center ml-2">
-                          <Users className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
+                        <div className="w-6 h-6 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center ml-1 sm:ml-2">
+                          <Users className="w-3 h-3 sm:w-6 sm:h-6 text-purple-600" />
                         </div>
                       </div>
-                      <p className="text-xs sm:text-sm text-purple-600 mt-2">Active users</p>
+                      <p className="text-xs text-purple-600 mt-1 sm:mt-2">Active users</p>
                     </CardContent>
                   </Card>
 
                   <Card className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 sm:p-6">
+                    <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium text-gray-600">Notifications</p>
+                          <p className="text-xs font-medium text-gray-600">Notifications</p>
                           <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.unread_notifications}</p>
                         </div>
-                        <div className="w-8 h-8 sm:w-12 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center ml-2">
-                          <Bell className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600" />
+                        <div className="w-6 h-6 sm:w-12 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center ml-1 sm:ml-2">
+                          <Bell className="w-3 h-3 sm:w-6 sm:h-6 text-orange-600" />
                         </div>
                       </div>
-                      <p className="text-xs sm:text-sm text-orange-600 mt-2">Unread</p>
+                      <p className="text-xs text-orange-600 mt-1 sm:mt-2">Unread</p>
                     </CardContent>
                   </Card>
                 </div>
 
+                {/* Recent Events Section */}
+                {recentEvents.length > 0 && (
+                  <Card>
+                    <CardContent className="p-3 sm:p-6">
+                      <div className="flex items-center justify-between mb-3 sm:mb-4">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <span className="font-semibold text-sm sm:text-base">Upcoming Events</span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setActiveTab('events')}
+                          className="text-xs sm:text-sm"
+                        >
+                          View All
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-2 sm:space-y-3">
+                        {recentEvents.slice(0, 3).map((event) => (
+                          <div key={event.id} className="flex items-center space-x-3 p-2 sm:p-3 rounded-lg hover:bg-gray-50">
+                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                              <Calendar className="w-4 h-4 text-green-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {event.title}
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                {new Date(event.start_date).toLocaleDateString()} • {event.event_type}
+                              </p>
+                              {event.location && (
+                                <p className="text-xs text-gray-500 truncate">
+                                  📍 {event.location}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Recent Activity */}
                 <Card>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Clock className="w-5 h-5" />
-                      <span className="font-semibold">Recent Activity</span>
+                  <CardContent className="p-3 sm:p-6">
+                    <div className="flex items-center space-x-2 mb-3 sm:mb-4">
+                      <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="font-semibold text-sm sm:text-base">Recent Activity</span>
                     </div>
                     
                     {loading ? (
-                      <div className="flex items-center justify-center h-32">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                      <div className="flex items-center justify-center h-20 sm:h-32">
+                        <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-blue-600" />
                       </div>
                     ) : recentActivity.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {recentActivity.map((activity) => (
-                          <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getActivityColor(activity.type)}`}>
+                          <div key={activity.id} className="flex items-start space-x-3 p-2 sm:p-3 rounded-lg hover:bg-gray-50">
+                            <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${getActivityColor(activity.type)}`}>
                               {getActivityIcon(activity.type)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">
                                 {activity.title}
                               </p>
-                              <p className="text-sm text-gray-600 truncate">
+                              <p className="text-xs sm:text-sm text-gray-600 truncate">
                                 {activity.description}
                               </p>
-                              <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">
                                 {activity.time}
                               </p>
                             </div>
@@ -398,9 +502,9 @@ const Index = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                        <p>No recent activity</p>
+                      <div className="text-center py-6 sm:py-8 text-gray-500">
+                        <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm">No recent activity</p>
                       </div>
                     )}
                   </CardContent>

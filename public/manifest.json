@@ -37,6 +37,22 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Events",
+      "short_name": "Events",
+      "description": "Open events directly",
+      "url": "/?tab=events",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }
