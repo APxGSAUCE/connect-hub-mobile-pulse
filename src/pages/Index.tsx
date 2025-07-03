@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -69,18 +70,7 @@ const Index = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchDashboardData();
-    }
-  }, [user, authLoading]);
-
-  // Set up real-time subscriptions for dashboard updates
-  useRealtimeSubscription('events', fetchDashboardData, [user]);
-  useRealtimeSubscription('messages', fetchDashboardData, [user]);
-  useRealtimeSubscription('notifications', fetchDashboardData, [user]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -166,7 +156,18 @@ const Index = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      fetchDashboardData();
+    }
+  }, [user, authLoading, fetchDashboardData]);
+
+  // Set up real-time subscriptions for dashboard updates
+  useRealtimeSubscription('events', fetchDashboardData, [user]);
+  useRealtimeSubscription('messages', fetchDashboardData, [user]);
+  useRealtimeSubscription('notifications', fetchDashboardData, [user]);
 
   const handleSignOut = async () => {
     try {
