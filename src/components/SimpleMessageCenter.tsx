@@ -6,11 +6,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { 
   Plus, MessageSquare, Send, Search, Users, User, 
-  Loader2, ArrowLeft, Paperclip, File, Download, X
+  Loader2, ArrowLeft, Paperclip, File, Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface ChatGroup {
   id: string;
@@ -68,7 +69,6 @@ const SimpleMessageCenter = () => {
     if (user) {
       fetchChatGroups();
       fetchEmployees();
-      setupRealtimeSubscription();
     }
   }, [user]);
 
@@ -76,34 +76,16 @@ const SimpleMessageCenter = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Set up real-time subscriptions
+  useRealtimeSubscription('messages', () => {
+    fetchChatGroups();
+    if (activeGroup) {
+      fetchMessages(activeGroup.id);
+    }
+  }, [user, activeGroup]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const setupRealtimeSubscription = () => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          const newMessage = payload.new as Message;
-          if (activeGroup && newMessage.group_id === activeGroup.id) {
-            fetchMessages(activeGroup.id);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const fetchChatGroups = async () => {
@@ -219,7 +201,6 @@ const SimpleMessageCenter = () => {
       if (error) throw error;
 
       setMessageContent('');
-      await fetchMessages(activeGroup.id);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -238,7 +219,6 @@ const SimpleMessageCenter = () => {
 
     setUploadingFile(true);
     try {
-      // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `messages/${fileName}`;
@@ -249,12 +229,10 @@ const SimpleMessageCenter = () => {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('files')
         .getPublicUrl(filePath);
 
-      // Send file message
       const { error } = await supabase
         .from('messages')
         .insert({
@@ -269,7 +247,6 @@ const SimpleMessageCenter = () => {
 
       if (error) throw error;
 
-      await fetchMessages(activeGroup.id);
       toast({
         title: "Success",
         description: "File uploaded successfully!",
@@ -459,7 +436,6 @@ const SimpleMessageCenter = () => {
             </Button>
           </div>
 
-          {/* Quick Direct Message */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Start a Direct Message</CardTitle>
@@ -506,7 +482,6 @@ const SimpleMessageCenter = () => {
             </CardContent>
           </Card>
 
-          {/* Chat Groups */}
           <Card className="flex-1 flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Your Conversations</CardTitle>

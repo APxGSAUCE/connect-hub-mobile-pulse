@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface Event {
   id: string;
@@ -53,49 +53,17 @@ const EventCalendar = () => {
     event_type: 'meeting'
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchEvents();
-    }
-  }, [user]);
-
-  // Set up real-time subscription for events
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('events-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'events'
-        },
-        () => {
-          console.log('Events changed, refetching...');
-          fetchEvents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
   const fetchEvents = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       
-      // Fetch events with participants
       const { data: eventsData, error } = await supabase
         .from('events')
         .select(`
           *,
-          event_participants!inner (
+          event_participants (
             id,
             user_id,
             status,
@@ -125,6 +93,15 @@ const EventCalendar = () => {
     }
   };
 
+  useEffect(() => {
+    if (user) {
+      fetchEvents();
+    }
+  }, [user]);
+
+  // Set up real-time subscription for events
+  useRealtimeSubscription('events', fetchEvents, [user]);
+
   const handleCreateOrUpdateEvent = async () => {
     if (!user) return;
 
@@ -148,7 +125,6 @@ const EventCalendar = () => {
 
     try {
       if (editingEvent) {
-        // Update existing event
         const { error } = await supabase
           .from('events')
           .update({
@@ -171,7 +147,6 @@ const EventCalendar = () => {
         
         setEditingEvent(null);
       } else {
-        // Create new event
         const { data: eventData, error: eventError } = await supabase
           .from('events')
           .insert({
@@ -188,7 +163,6 @@ const EventCalendar = () => {
 
         if (eventError) throw eventError;
 
-        // Add creator as participant
         const { error: participantError } = await supabase
           .from('event_participants')
           .insert({
@@ -205,7 +179,6 @@ const EventCalendar = () => {
         });
       }
 
-      // Reset form
       setNewEvent({
         title: '',
         description: '',
@@ -215,9 +188,6 @@ const EventCalendar = () => {
         event_type: 'meeting'
       });
       setIsDialogOpen(false);
-      
-      // Refresh events
-      fetchEvents();
 
     } catch (error) {
       console.error('Error creating/updating event:', error);
@@ -233,13 +203,11 @@ const EventCalendar = () => {
     if (!user) return;
 
     try {
-      // Delete participants first
       await supabase
         .from('event_participants')
         .delete()
         .eq('event_id', eventId);
 
-      // Delete event
       const { error } = await supabase
         .from('events')
         .delete()
@@ -251,8 +219,6 @@ const EventCalendar = () => {
         title: "Success",
         description: "Event deleted successfully!",
       });
-
-      fetchEvents();
 
     } catch (error) {
       console.error('Error deleting event:', error);
@@ -269,7 +235,7 @@ const EventCalendar = () => {
     setNewEvent({
       title: event.title,
       description: event.description || '',
-      start_date: event.start_date.slice(0, 16), // Format for datetime-local input
+      start_date: event.start_date.slice(0, 16),
       end_date: event.end_date.slice(0, 16),
       location: event.location || '',
       event_type: event.event_type

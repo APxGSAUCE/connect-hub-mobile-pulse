@@ -15,6 +15,7 @@ import SimpleMessageCenter from "@/components/SimpleMessageCenter";
 import EventCalendar from "@/components/EventCalendar";
 import ProfileMenu from "@/components/ProfileMenu";
 import EmployeeManagement from "@/components/EmployeeManagement";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface DashboardStats {
   total_messages: number;
@@ -75,46 +76,9 @@ const Index = () => {
   }, [user, authLoading]);
 
   // Set up real-time subscriptions for dashboard updates
-  useEffect(() => {
-    if (!user) return;
-
-    const eventsChannel = supabase
-      .channel('dashboard-events')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'events'
-        },
-        () => {
-          console.log('Events changed, updating dashboard...');
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
-
-    const messagesChannel = supabase
-      .channel('dashboard-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        () => {
-          console.log('New message, updating dashboard...');
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(eventsChannel);
-      supabase.removeChannel(messagesChannel);
-    };
-  }, [user]);
+  useRealtimeSubscription('events', fetchDashboardData, [user]);
+  useRealtimeSubscription('messages', fetchDashboardData, [user]);
+  useRealtimeSubscription('notifications', fetchDashboardData, [user]);
 
   const fetchDashboardData = async () => {
     if (!user) return;
@@ -122,9 +86,7 @@ const Index = () => {
     try {
       setLoading(true);
 
-      // Fetch comprehensive dashboard data
       const [messagesResult, employeesResult, eventsResult, notificationsResult, recentEventsResult] = await Promise.all([
-        // Messages count
         supabase
           .from('chat_group_members')
           .select('group_id')
@@ -138,26 +100,22 @@ const Index = () => {
               .in('group_id', groupIds);
           }),
         
-        // Active employees count
         supabase
           .from('profiles')
           .select('id')
           .eq('status', 'active'),
         
-        // Upcoming events count
         supabase
           .from('events')
           .select('id')
           .gte('start_date', new Date().toISOString()),
         
-        // Unread notifications
         supabase
           .from('notifications')
           .select('id')
           .eq('user_id', user.id)
           .eq('is_read', false),
 
-        // Recent events for dashboard display
         supabase
           .from('events')
           .select('id, title, start_date, event_type, location')
@@ -166,7 +124,6 @@ const Index = () => {
           .limit(3)
       ]);
 
-      // Calculate unread messages (messages from others)
       const totalMessages = (await messagesResult).data?.length || 0;
       const unreadMessages = (await messagesResult).data?.filter(
         msg => msg.sender_id !== user.id
@@ -180,10 +137,8 @@ const Index = () => {
         unread_notifications: notificationsResult.data?.length || 0
       });
 
-      // Set recent events
       setRecentEvents(recentEventsResult.data || []);
 
-      // Fetch recent notifications for activity feed
       const { data: notifications } = await supabase
         .from('notifications')
         .select('*')
