@@ -77,5 +77,6 @@
       "label": "One Ilocos Sur Portal Dashboard"
     }
   ],
-  "display_override": ["window-controls-overlay", "minimal-ui", "standalone", "browser"]
+  "display_override": ["window-controls-overlay", "minimal-ui", "standalone", "browser"],
+  "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
 }
