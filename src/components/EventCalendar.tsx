@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,18 +24,6 @@ interface Event {
   event_type: string;
   created_by: string;
   created_at: string;
-  participants?: EventParticipant[];
-}
-
-interface EventParticipant {
-  id: string;
-  user_id: string;
-  status: 'invited' | 'accepted' | 'declined' | 'maybe';
-  profiles?: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string | null;
-  };
 }
 
 const EventCalendar = () => {
@@ -59,24 +48,16 @@ const EventCalendar = () => {
     try {
       setLoading(true);
       
+      // Simplified query without the problematic join
       const { data: eventsData, error } = await supabase
         .from('events')
-        .select(`
-          *,
-          event_participants (
-            id,
-            user_id,
-            status,
-            profiles (
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select('*')
         .order('start_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       console.log('Fetched events data:', eventsData);
       setEvents(eventsData || []);
@@ -163,6 +144,7 @@ const EventCalendar = () => {
 
         if (eventError) throw eventError;
 
+        // Create participant entry for the creator
         const { error: participantError } = await supabase
           .from('event_participants')
           .insert({
@@ -171,7 +153,10 @@ const EventCalendar = () => {
             status: 'accepted'
           });
 
-        if (participantError) throw participantError;
+        if (participantError) {
+          console.warn('Could not add participant:', participantError);
+          // Don't throw error as event creation was successful
+        }
 
         toast({
           title: "Success",
@@ -188,6 +173,7 @@ const EventCalendar = () => {
         event_type: 'meeting'
       });
       setIsDialogOpen(false);
+      fetchEvents(); // Refresh events list
 
     } catch (error) {
       console.error('Error creating/updating event:', error);
@@ -203,6 +189,7 @@ const EventCalendar = () => {
     if (!user) return;
 
     try {
+      // Delete participants first (if any)
       await supabase
         .from('event_participants')
         .delete()
@@ -219,6 +206,8 @@ const EventCalendar = () => {
         title: "Success",
         description: "Event deleted successfully!",
       });
+
+      fetchEvents(); // Refresh events list
 
     } catch (error) {
       console.error('Error deleting event:', error);
@@ -286,86 +275,92 @@ const EventCalendar = () => {
   }
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6 pb-20 md:pb-6 px-1 sm:px-0">
+      {/* Header - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Events Calendar</h2>
-          <p className="text-gray-600">Manage and view upcoming events</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Events Calendar</h2>
+          <p className="text-sm sm:text-base text-gray-600">Manage and view upcoming events</p>
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Create Event
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto mx-auto">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">
                 {editingEvent ? 'Edit Event' : 'Create New Event'}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm">
                 {editingEvent ? 'Update event details' : 'Add a new event to the calendar'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="title">Title *</Label>
+                <Label htmlFor="title" className="text-sm font-medium">Title *</Label>
                 <Input
                   id="title"
                   placeholder="Enter event title"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  className="text-base" // Prevent zoom on iOS
                 />
               </div>
               
               <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-sm font-medium">Description</Label>
                 <Textarea
                   id="description"
                   placeholder="Enter event description"
                   value={newEvent.description}
                   onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  className="text-base min-h-[80px]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="start_date">Start Date & Time *</Label>
+                  <Label htmlFor="start_date" className="text-sm font-medium">Start Date & Time *</Label>
                   <Input
                     id="start_date"
                     type="datetime-local"
                     value={newEvent.start_date}
                     onChange={(e) => setNewEvent({ ...newEvent, start_date: e.target.value })}
+                    className="text-base"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="end_date">End Date & Time *</Label>
+                  <Label htmlFor="end_date" className="text-sm font-medium">End Date & Time *</Label>
                   <Input
                     id="end_date"
                     type="datetime-local"
                     value={newEvent.end_date}
                     onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
+                    className="text-base"
                   />
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location" className="text-sm font-medium">Location</Label>
                 <Input
                   id="location"
                   placeholder="Enter event location"
                   value={newEvent.location}
                   onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  className="text-base"
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="event_type">Event Type</Label>
+                <Label htmlFor="event_type" className="text-sm font-medium">Event Type</Label>
                 <select
                   id="event_type"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background"
                   value={newEvent.event_type}
                   onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
                 >
@@ -379,11 +374,11 @@ const EventCalendar = () => {
               </div>
             </div>
             
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={closeDialog}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
+              <Button variant="outline" onClick={closeDialog} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={handleCreateOrUpdateEvent}>
+              <Button onClick={handleCreateOrUpdateEvent} className="w-full sm:w-auto">
                 {editingEvent ? 'Update Event' : 'Create Event'}
               </Button>
             </div>
@@ -391,47 +386,49 @@ const EventCalendar = () => {
         </Dialog>
       </div>
 
-      {/* Events List */}
-      <div className="space-y-4">
+      {/* Events List - Mobile optimized */}
+      <div className="space-y-3 sm:space-y-4">
         {events.length > 0 ? (
           events.map((event) => {
             const eventStatus = getEventStatus(event.start_date, event.end_date);
             return (
               <Card key={event.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">{event.title}</CardTitle>
+                <CardHeader className="pb-2 sm:pb-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base sm:text-lg truncate">{event.title}</CardTitle>
                       {event.description && (
-                        <CardDescription className="mt-1">
+                        <CardDescription className="mt-1 text-sm line-clamp-2">
                           {event.description}
                         </CardDescription>
                       )}
                     </div>
                     
-                    <div className="flex items-center space-x-2 ml-4">
-                      <Badge className={getEventTypeColor(event.event_type)}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={`${getEventTypeColor(event.event_type)} text-xs`}>
                         {event.event_type}
                       </Badge>
-                      <Badge className={eventStatus.color}>
+                      <Badge className={`${eventStatus.color} text-xs`}>
                         {eventStatus.status}
                       </Badge>
                       
                       {user && event.created_by === user.id && (
-                        <div className="flex space-x-1">
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditEvent(event)}
+                            className="h-8 w-8 p-0"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3 h-3" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteEvent(event.id)}
+                            className="h-8 w-8 p-0"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       )}
@@ -439,28 +436,20 @@ const EventCalendar = () => {
                   </div>
                 </CardHeader>
                 
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                        <span>
-                          {format(parseISO(event.start_date), 'MMM dd, yyyy HH:mm')} - {format(parseISO(event.end_date), 'MMM dd, yyyy HH:mm')}
-                        </span>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div>{format(parseISO(event.start_date), 'MMM dd, yyyy HH:mm')}</div>
+                        <div>to {format(parseISO(event.end_date), 'MMM dd, yyyy HH:mm')}</div>
                       </div>
                     </div>
                     
                     {event.location && (
-                      <div className="flex items-center space-x-1 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
-                    
-                    {event.participants && event.participants.length > 0 && (
-                      <div className="flex items-center space-x-1 text-sm text-gray-600">
-                        <Users className="w-4 h-4" />
-                        <span>{event.participants.length} participant(s)</span>
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span className="truncate">{event.location}</span>
                       </div>
                     )}
                   </div>
@@ -470,11 +459,11 @@ const EventCalendar = () => {
           })
         ) : (
           <Card>
-            <CardContent className="p-12 text-center">
-              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
-              <p className="text-gray-600 mb-4">Create your first event to get started</p>
-              <Button onClick={() => setIsDialogOpen(true)}>
+            <CardContent className="p-8 sm:p-12 text-center">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No events yet</h3>
+              <p className="text-sm text-gray-600 mb-4">Create your first event to get started</p>
+              <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Event
               </Button>

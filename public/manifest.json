@@ -7,10 +7,10 @@
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#3b82f6",
-  "background_color": "#ffffff",
+  "background_color": "#f8fafc",
   "scope": "/",
   "lang": "en-US",
-  "categories": ["business", "productivity"],
+  "categories": ["business", "productivity", "social"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -40,7 +40,7 @@
     },
     {
       "name": "Events",
-      "short_name": "Events",
+      "short_name": "Events", 
       "description": "Open events directly",
       "url": "/?tab=events",
       "icons": [
@@ -49,10 +49,33 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Team",
+      "short_name": "Team",
+      "description": "View team members",
+      "url": "/?tab=employees", 
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
+  "related_applications": [],
   "prefer_related_applications": false,
   "edge_side_panel": {
     "preferred_width": 400
-  }
+  },
+  "screenshots": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "PGIS Connect Dashboard"
+    }
+  ],
+  "display_override": ["window-controls-overlay", "minimal-ui", "standalone", "browser"]
 }
