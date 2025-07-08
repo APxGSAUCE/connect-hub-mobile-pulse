@@ -26,6 +26,7 @@ const Auth = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -41,16 +42,35 @@ const Auth = () => {
   }, [navigate]);
 
   const fetchDepartments = async () => {
+    setLoadingDepartments(true);
     try {
+      console.log('Fetching departments...');
       const { data, error } = await supabase
         .from('departments')
-        .select('*')
+        .select('id, name, description')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching departments:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load departments. Please refresh the page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Departments fetched:', data);
       setDepartments(data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load departments. Please refresh the page.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDepartments(false);
     }
   };
 
@@ -238,7 +258,7 @@ const Auth = () => {
               <Users className="w-8 h-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">PGIS Connect</CardTitle>
+          <CardTitle className="text-2xl font-bold">One Ilocos Sur Portal</CardTitle>
           <CardDescription>
             {isLogin ? "Welcome back! Please sign in to your account." : "Create your account to get started."}
           </CardDescription>
@@ -286,19 +306,49 @@ const Auth = () => {
                   <Label htmlFor="department">Department *</Label>
                   <div className="relative">
                     <Building className="w-4 h-4 absolute left-3 top-3 text-gray-400 z-10" />
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={loading}>
+                    <Select 
+                      value={selectedDepartment} 
+                      onValueChange={setSelectedDepartment} 
+                      disabled={loading || loadingDepartments}
+                    >
                       <SelectTrigger className="pl-10">
-                        <SelectValue placeholder="Select your department" />
+                        <SelectValue placeholder={
+                          loadingDepartments 
+                            ? "Loading departments..." 
+                            : departments.length === 0 
+                              ? "No departments available" 
+                              : "Select your department"
+                        } />
                       </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            {dept.name}
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {loadingDepartments ? (
+                          <SelectItem value="loading" disabled>
+                            Loading departments...
                           </SelectItem>
-                        ))}
+                        ) : departments.length === 0 ? (
+                          <SelectItem value="empty" disabled>
+                            No departments available
+                          </SelectItem>
+                        ) : (
+                          departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id} className="cursor-pointer hover:bg-gray-50">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{dept.name}</span>
+                                {dept.description && (
+                                  <span className="text-xs text-gray-500">{dept.description}</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
+                  {!loadingDepartments && departments.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Unable to load departments. Please refresh the page or contact support.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -310,7 +360,7 @@ const Auth = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="john@pgis.com"
+                  placeholder="john@ilocossur.gov.ph"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
@@ -350,7 +400,7 @@ const Auth = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || (loadingDepartments && !isLogin)}>
               {loading ? (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -375,6 +425,12 @@ const Auth = () => {
               }
             </button>
           </div>
+
+          {!isLogin && loadingDepartments && (
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">Loading departments...</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
