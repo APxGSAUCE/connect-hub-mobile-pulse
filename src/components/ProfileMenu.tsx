@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Settings, LogOut, Edit3, Save, X, Loader2, Building } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { User, Settings, LogOut, Edit3, Save, X, Loader2, Building, Bell, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,20 @@ interface Department {
   description: string;
 }
 
+interface NotificationSettings {
+  email_notifications: boolean;
+  push_notifications: boolean;
+  event_reminders: boolean;
+  message_notifications: boolean;
+}
+
+interface PrivacySettings {
+  profile_visibility: 'public' | 'private' | 'team_only';
+  show_email: boolean;
+  show_phone: boolean;
+  show_department: boolean;
+}
+
 const ProfileMenu = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
@@ -38,6 +53,9 @@ const ProfileMenu = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(true);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: '',
     lastName: '',
@@ -49,10 +67,25 @@ const ProfileMenu = () => {
     role: 'employee'
   });
 
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    email_notifications: true,
+    push_notifications: true,
+    event_reminders: true,
+    message_notifications: true
+  });
+
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
+    profile_visibility: 'team_only',
+    show_email: false,
+    show_phone: false,
+    show_department: true
+  });
+
   useEffect(() => {
     if (user) {
       fetchProfile();
       fetchDepartments();
+      loadUserSettings();
     }
   }, [user]);
 
@@ -77,10 +110,7 @@ const ProfileMenu = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          department:departments(id, name, description)
-        `)
+        .select(`*, department:departments(id, name, description)`)
         .eq('id', user.id)
         .single();
 
@@ -106,7 +136,6 @@ const ProfileMenu = () => {
           role: data.role || 'employee'
         });
       } else {
-        // Set default values if no profile exists
         setProfileData({
           firstName: user.user_metadata?.first_name || '',
           lastName: user.user_metadata?.last_name || '',
@@ -127,6 +156,44 @@ const ProfileMenu = () => {
       });
     } finally {
       setFetchingProfile(false);
+    }
+  };
+
+  const loadUserSettings = () => {
+    // Load from localStorage as a simple implementation
+    const savedNotifications = localStorage.getItem(`notifications_${user?.id}`);
+    const savedPrivacy = localStorage.getItem(`privacy_${user?.id}`);
+    
+    if (savedNotifications) {
+      setNotificationSettings(JSON.parse(savedNotifications));
+    }
+    
+    if (savedPrivacy) {
+      setPrivacySettings(JSON.parse(savedPrivacy));
+    }
+  };
+
+  const saveUserSettings = async (type: 'notifications' | 'privacy') => {
+    if (!user) return;
+
+    try {
+      if (type === 'notifications') {
+        localStorage.setItem(`notifications_${user.id}`, JSON.stringify(notificationSettings));
+      } else {
+        localStorage.setItem(`privacy_${user.id}`, JSON.stringify(privacySettings));
+      }
+
+      toast({
+        title: "Settings Updated",
+        description: `${type === 'notifications' ? 'Notification' : 'Privacy'} settings have been saved.`,
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -200,7 +267,7 @@ const ProfileMenu = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
-    fetchProfile(); // Reset form data
+    fetchProfile();
   };
 
   const handleSignOut = async () => {
@@ -465,30 +532,180 @@ const ProfileMenu = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Notifications Settings */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
               <h4 className="font-medium text-gray-900">Notifications</h4>
               <p className="text-sm text-gray-600">Manage your notification preferences</p>
             </div>
-            <Button variant="outline" size="sm">
-              Configure
-            </Button>
+            <Dialog open={showNotificationSettings} onOpenChange={setShowNotificationSettings}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Configure
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Bell className="w-5 h-5" />
+                    <span>Notification Settings</span>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Choose how you want to be notified about activities.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="email-notifications">Email Notifications</Label>
+                    <Switch
+                      id="email-notifications"
+                      checked={notificationSettings.email_notifications}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings({ ...notificationSettings, email_notifications: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="push-notifications">Push Notifications</Label>
+                    <Switch
+                      id="push-notifications"
+                      checked={notificationSettings.push_notifications}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings({ ...notificationSettings, push_notifications: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="event-reminders">Event Reminders</Label>
+                    <Switch
+                      id="event-reminders"
+                      checked={notificationSettings.event_reminders}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings({ ...notificationSettings, event_reminders: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="message-notifications">Message Notifications</Label>
+                    <Switch
+                      id="message-notifications"
+                      checked={notificationSettings.message_notifications}
+                      onCheckedChange={(checked) =>
+                        setNotificationSettings({ ...notificationSettings, message_notifications: checked })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowNotificationSettings(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => {
+                    saveUserSettings('notifications');
+                    setShowNotificationSettings(false);
+                  }}>
+                    Save Settings
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
+          {/* Privacy Settings */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
               <h4 className="font-medium text-gray-900">Privacy Settings</h4>
               <p className="text-sm text-gray-600">Control your privacy and data sharing</p>
             </div>
-            <Button variant="outline" size="sm">
-              Manage
-            </Button>
+            <Dialog open={showPrivacySettings} onOpenChange={setShowPrivacySettings}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Manage
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5" />
+                    <span>Privacy Settings</span>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Control who can see your information and how it's shared.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-visibility">Profile Visibility</Label>
+                    <Select
+                      value={privacySettings.profile_visibility}
+                      onValueChange={(value: 'public' | 'private' | 'team_only') =>
+                        setPrivacySettings({ ...privacySettings, profile_visibility: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Public - Everyone can see</SelectItem>
+                        <SelectItem value="team_only">Team Only - Only team members</SelectItem>
+                        <SelectItem value="private">Private - Only you can see</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="show-email">Show Email Address</Label>
+                    <Switch
+                      id="show-email"
+                      checked={privacySettings.show_email}
+                      onCheckedChange={(checked) =>
+                        setPrivacySettings({ ...privacySettings, show_email: checked })
+                      }
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="show-phone">Show Phone Number</Label>
+                    <Switch
+                      id="show-phone"
+                      checked={privacySettings.show_phone}
+                      onCheckedChange={(checked) =>
+                        setPrivacySettings({ ...privacySettings, show_phone: checked })
+                      }
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="show-department">Show Department</Label>
+                    <Switch
+                      id="show-department"
+                      checked={privacySettings.show_department}
+                      onCheckedChange={(checked) =>
+                        setPrivacySettings({ ...privacySettings, show_department: checked })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowPrivacySettings(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => {
+                    saveUserSettings('privacy');
+                    setShowPrivacySettings(false);
+                  }}>
+                    Save Settings
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
+          {/* Sign Out */}
           <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
             <div>
               <h4 className="font-medium text-red-900">Sign Out</h4>
-              <p className="text-sm text-red-600">Sign out of your PGIS Connect account</p>
+              <p className="text-sm text-red-600">Sign out of your One Ilocos Sur Portal account</p>
             </div>
             <Button variant="destructive" size="sm" onClick={handleSignOut} disabled={loading}>
               <LogOut className="w-4 h-4 mr-2" />
