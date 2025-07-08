@@ -231,7 +231,7 @@ const Index = () => {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">PGIS Connect</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">One Ilocos Sur Portal</h1>
             </div>
             
             <div className="flex items-center space-x-2 sm:space-x-4">
