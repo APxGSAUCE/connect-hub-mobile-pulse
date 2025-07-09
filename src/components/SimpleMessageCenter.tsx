@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
+import MessageStatus from "./MessageStatus";
 
 interface ChatGroup {
   id: string;
@@ -34,11 +36,12 @@ interface Message {
   created_at: string;
   sender_id: string;
   group_id: string;
+  message_status?: 'sending' | 'sent' | 'delivered' | 'read';
   sender?: {
     first_name: string | null;
     last_name: string | null;
     email: string | null;
-  };
+  } | null;
 }
 
 interface Employee {
@@ -109,21 +112,21 @@ const SimpleMessageCenter = () => {
             .eq('group_id', group.id);
 
           // Get last message with sender info using separate queries
-          const { data: lastMessageData } = await supabase
+          const { data: lastMessageData, error: messageError } = await supabase
             .from('messages')
             .select('content, created_at, sender_id')
             .eq('group_id', group.id)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           let senderName = 'Unknown';
-          if (lastMessageData) {
+          if (lastMessageData && !messageError) {
             const { data: senderData } = await supabase
               .from('profiles')
               .select('first_name, last_name, email')
               .eq('id', lastMessageData.sender_id)
-              .single();
+              .maybeSingle();
 
             if (senderData) {
               senderName = `${senderData.first_name || ''} ${senderData.last_name || ''}`.trim() || senderData.email || 'Unknown';
@@ -133,7 +136,7 @@ const SimpleMessageCenter = () => {
           return {
             ...group,
             member_count: memberCount || 0,
-            last_message: lastMessageData ? {
+            last_message: lastMessageData && !messageError ? {
               content: lastMessageData.content,
               created_at: lastMessageData.created_at,
               sender_name: senderName
@@ -184,11 +187,12 @@ const SimpleMessageCenter = () => {
             .from('profiles')
             .select('first_name, last_name, email')
             .eq('id', message.sender_id)
-            .single();
+            .maybeSingle();
 
           return {
             ...message,
-            sender: senderData
+            sender: senderData,
+            message_status: 'delivered' as const // Default status for existing messages
           };
         })
       );
@@ -242,20 +246,45 @@ const SimpleMessageCenter = () => {
   const handleSendMessage = async () => {
     if (!user || !selectedGroup || !newMessage.trim()) return;
 
+    // Add optimistic message
+    const optimisticMessage: Message = {
+      id: `temp-${Date.now()}`,
+      content: newMessage.trim(),
+      group_id: selectedGroup.id,
+      sender_id: user.id,
+      created_at: new Date().toISOString(),
+      message_status: 'sending',
+      sender: {
+        first_name: user.user_metadata?.first_name || null,
+        last_name: user.user_metadata?.last_name || null,
+        email: user.email || null
+      }
+    };
+
+    setMessages(prev => [...prev, optimisticMessage]);
+    setNewMessage("");
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           content: newMessage.trim(),
           group_id: selectedGroup.id,
           sender_id: user.id,
           message_type: 'text'
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      setNewMessage("");
-      fetchMessages(selectedGroup.id);
+      // Update optimistic message with real data
+      setMessages(prev => prev.map(msg => 
+        msg.id === optimisticMessage.id 
+          ? { ...msg, id: data.id, message_status: 'sent' as const }
+          : msg
+      ));
+
       fetchGroups(); // Refresh to update last message
 
       // Show notification to other users
@@ -266,6 +295,11 @@ const SimpleMessageCenter = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+      setNewMessage(newMessage.trim()); // Restore message content
+      
       toast({
         title: "Error",
         description: "Failed to send message.",
@@ -632,15 +666,16 @@ const SimpleMessageCenter = () => {
                                 </p>
                               )}
                               <p className="text-sm">{message.content}</p>
-                              <p
-                                className={`text-xs mt-1 ${
-                                  message.sender_id === user?.id
-                                    ? 'text-blue-100'
-                                    : 'text-gray-500'
-                                }`}
-                              >
-                                {new Date(message.created_at).toLocaleTimeString()}
-                              </p>
+                              {message.sender_id === user?.id ? (
+                                <MessageStatus 
+                                  status={message.message_status || 'sent'} 
+                                  timestamp={message.created_at}
+                                />
+                              ) : (
+                                <p className="text-xs mt-1 opacity-75">
+                                  {new Date(message.created_at).toLocaleTimeString()}
+                                </p>
+                              )}
                             </div>
                           </div>
                         ))}

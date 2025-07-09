@@ -1,21 +1,26 @@
 
-const CACHE_NAME = 'pgis-connect-v1';
+// Service Worker for push notifications and caching
+const CACHE_NAME = 'isurve-portal-v1';
 const urlsToCache = [
   '/',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/static/js/bundle.js',
+  '/static/css/main.css',
+  '/manifest.json'
 ];
 
 // Install event
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
+        console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
+      .catch((error) => {
+        console.error('Cache failed:', error);
+      })
   );
-  self.skipWaiting();
 });
 
 // Fetch event
@@ -25,52 +30,58 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // Return cached version or fetch from network
         return response || fetch(event.request);
-      }
-    )
+      })
+      .catch((error) => {
+        console.error('Fetch failed:', error);
+      })
   );
 });
 
-// Activate event
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Push notification event
+// Push event for notifications
 self.addEventListener('push', (event) => {
+  console.log('Push event received:', event);
+  
   const options = {
     body: event.data ? event.data.text() : 'New notification',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: 'notification',
-    requireInteraction: true
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    },
+    tag: 'notification'
   };
 
   event.waitUntil(
-    self.registration.showNotification('One Ilocos Sur Portal', options)
+    self.registration.showNotification('iSurve Portal', options)
   );
 });
 
 // Notification click event
 self.addEventListener('notificationclick', (event) => {
+  console.log('Notification click received:', event);
+  
   event.notification.close();
-
+  
   event.waitUntil(
-    clients.matchAll().then((clientList) => {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
-      }
-      return clients.openWindow('/');
+    clients.openWindow('/')
+  );
+});
+
+// Activate event
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
     })
   );
 });
