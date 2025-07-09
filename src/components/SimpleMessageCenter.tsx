@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -175,40 +174,14 @@ const SimpleMessageCenter = () => {
 
       if (error) {
         console.error('Error fetching messages:', error);
-        // Fallback query without join if foreign key doesn't exist
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('group_id', groupId)
-          .order('created_at', { ascending: true });
-
-        if (fallbackError) {
-          throw fallbackError;
-        }
-
-        const messagesWithSender = await Promise.all(
-          (fallbackData || []).map(async (message) => {
-            const { data: senderData } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, email')
-              .eq('id', message.sender_id)
-              .single();
-
-            return {
-              ...message,
-              sender: senderData
-            };
-          })
-        );
-
-        setMessages(messagesWithSender);
-      } else {
-        const formattedMessages = (messagesData || []).map(msg => ({
-          ...msg,
-          sender: msg.profiles
-        }));
-        setMessages(formattedMessages);
+        throw error;
       }
+
+      const formattedMessages = (messagesData || []).map(msg => ({
+        ...msg,
+        sender: msg.profiles
+      }));
+      setMessages(formattedMessages);
 
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -685,7 +658,7 @@ const SimpleMessageCenter = () => {
                       </Button>
                     </div>
                   </div>
-                </div>
+                </CardContent>
               </>
             ) : (
               <CardContent className="flex-1 flex items-center justify-center">
