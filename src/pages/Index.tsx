@@ -12,7 +12,9 @@ import {
   LogOut,
   TrendingUp,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Bell,
+  Activity
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +34,7 @@ interface DashboardStats {
   totalEvents: number;
   totalEmployees: number;
   upcomingEvents: number;
+  unreadNotifications: number;
 }
 
 const Index = () => {
@@ -43,10 +46,10 @@ const Index = () => {
     totalMessages: 0,
     totalEvents: 0,
     totalEmployees: 0,
-    upcomingEvents: 0
+    upcomingEvents: 0,
+    unreadNotifications: 0
   });
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pwa = usePWA();
 
   const activeTab = searchParams.get("tab") || "dashboard";
@@ -59,7 +62,6 @@ const Index = () => {
     fetchDashboardStats();
   }, [user, navigate]);
 
-  // Add PWB-specific body class
   useEffect(() => {
     if (pwa.isStandalone) {
       document.body.classList.add('pwa-standalone');
@@ -112,11 +114,19 @@ const Index = () => {
         .gte('start_date', new Date().toISOString())
         .lte('start_date', nextWeek.toISOString());
 
+      // Fetch unread notifications
+      const { count: unreadCount } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
       setStats({
         totalMessages: messageCount,
         totalEvents: eventsCount || 0,
         totalEmployees: employeesCount || 0,
-        upcomingEvents: upcomingCount || 0
+        upcomingEvents: upcomingCount || 0,
+        unreadNotifications: unreadCount || 0
       });
 
     } catch (error) {
@@ -133,7 +143,6 @@ const Index = () => {
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
-    setSidebarOpen(false);
   };
 
   const handleSignOut = async () => {
@@ -154,265 +163,153 @@ const Index = () => {
     }
   };
 
-  const quickActions = [
-    {
-      title: "Messages",
-      description: "Start a conversation",
-      icon: MessageSquare,
-      color: "bg-blue-500",
-      action: () => handleTabChange("messages")
-    },
-    {
-      title: "Events",
-      description: "Schedule a meeting",
-      icon: Calendar,
-      color: "bg-green-500",
-      action: () => handleTabChange("events")
-    },
-    {
-      title: "People",
-      description: "Manage team members",
-      icon: Users,
-      color: "bg-purple-500",
-      action: () => handleTabChange("people")
-    }
-  ];
-
   if (!user) {
     return null;
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden ios-fix">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* Offline Indicator */}
       <OfflineIndicator />
       
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
 
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col">
-        <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-card border-r border-border">
-          <div className="flex items-center flex-shrink-0 px-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Home className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="text-xl font-bold text-foreground">iSurve Portal</h1>
-            </div>
-          </div>
-          
-          <div className="mt-8 flex-grow flex flex-col">
-            <nav className="flex-1 px-4 space-y-2">
-              <button
-                onClick={() => handleTabChange("dashboard")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
-                  activeTab === "dashboard"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                <Home className="mr-3 h-5 w-5" />
-                Dashboard
-              </button>
-              
-              <button
-                onClick={() => handleTabChange("messages")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
-                  activeTab === "messages"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                <MessageSquare className="mr-3 h-5 w-5" />
-                Messages
-                {stats.totalMessages > 0 && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {stats.totalMessages}
-                  </Badge>
-                )}
-              </button>
-              
-              <button
-                onClick={() => handleTabChange("events")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
-                  activeTab === "events"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                <Calendar className="mr-3 h-5 w-5" />
-                Events
-                {stats.upcomingEvents > 0 && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {stats.upcomingEvents}
-                  </Badge>
-                )}
-              </button>
-              
-              <button
-                onClick={() => handleTabChange("people")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
-                  activeTab === "people"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                <Users className="mr-3 h-5 w-5" />
-                People
-                {stats.totalEmployees > 0 && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {stats.totalEmployees}
-                  </Badge>
-                )}
-              </button>
-            </nav>
-            
-            <div className="flex-shrink-0 p-4 border-t border-border">
-              <div className="flex items-center justify-between">
-                <ProfileMenu />
-                <Button
-                  onClick={handleSignOut}
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 touch-manipulation"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* PWA Header */}
+      <PWAHeader 
+        title={
+          activeTab === "dashboard" ? "One Ilocos Sur Portal" :
+          activeTab === "messages" ? "Chat" :
+          activeTab === "events" ? "Events" :
+          activeTab === "people" ? "People" : "One Ilocos Sur Portal"
+        }
+        showSearch={activeTab === "messages" || activeTab === "people"}
+      />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Mobile Header */}
-        <PWAHeader 
-          title={
-            activeTab === "dashboard" ? "Dashboard" :
-            activeTab === "messages" ? "Messages" :
-            activeTab === "events" ? "Events" :
-            activeTab === "people" ? "People" : "iSurve Portal"
-          }
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-          showSearch={activeTab === "messages" || activeTab === "people"}
-        />
+      <main className="flex-1 overflow-y-auto bg-background pb-20 safe-area-bottom">
+        <div className="h-full">
+          {activeTab === "dashboard" && (
+            <div className="p-4 space-y-6">
+              {/* Welcome Section */}
+              <div className="text-center pt-4">
+                <h2 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
+                  Welcome back! 👋
+                </h2>
+                <p className="text-muted-foreground mt-2">Here's what's happening in your organization today.</p>
+              </div>
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-y-auto bg-background pb-20 md:pb-0">
-          <div className="h-full">
-            {activeTab === "dashboard" && (
-              <div className="p-4 md:p-6 space-y-6">
-                {/* Welcome Section */}
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">
-                    Welcome back, {user.user_metadata?.first_name || user.email}!
-                  </h2>
-                  <p className="text-muted-foreground">Here's what's happening in your organization today.</p>
-                </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="touch-manipulation">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Messages</CardTitle>
-                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats.totalMessages}</div>
-                      <p className="text-xs text-muted-foreground">
-                        All conversations
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="touch-manipulation">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats.upcomingEvents}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Next 7 days
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="touch-manipulation">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Events</CardTitle>
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats.totalEvents}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Total scheduled
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="touch-manipulation">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Team</CardTitle>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats.totalEmployees}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Active members
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Quick Actions */}
-                <Card className="touch-manipulation">
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                    <CardDescription>
-                      Common tasks to get you started
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {quickActions.map((action, index) => (
-                        <button
-                          key={index}
-                          onClick={action.action}
-                          className="p-4 border border-border rounded-lg hover:bg-accent transition-colors text-left group touch-manipulation"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className={`p-2 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
-                              <action.icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-foreground">{action.title}</h3>
-                              <p className="text-sm text-muted-foreground">{action.description}</p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="touch-manipulation app-transition hover:scale-105">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Messages</CardTitle>
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                      </div>
                     </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-2xl font-bold">{stats.totalMessages}</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="touch-manipulation app-transition hover:scale-105">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Events</CardTitle>
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Calendar className="h-4 w-4 text-green-600" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-2xl font-bold">{stats.totalEvents}</div>
+                    <p className="text-xs text-green-600 font-medium">Upcoming</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="touch-manipulation app-transition hover:scale-105">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Team</CardTitle>
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Users className="h-4 w-4 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-2xl font-bold">{stats.totalEmployees}</div>
+                    <p className="text-xs text-purple-600 font-medium">Active users</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="touch-manipulation app-transition hover:scale-105">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Notifications</CardTitle>
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Bell className="h-4 w-4 text-orange-600" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-2xl font-bold">{stats.unreadNotifications}</div>
+                    <p className="text-xs text-orange-600 font-medium">Unread</p>
                   </CardContent>
                 </Card>
               </div>
-            )}
 
-            {activeTab === "messages" && <SimpleMessageCenter />}
-            {activeTab === "events" && <EventCalendar />}
-            {activeTab === "people" && <EmployeeManagement />}
-          </div>
-        </main>
+              {/* Recent Activity Section */}
+              <Card className="touch-manipulation">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-muted-foreground" />
+                    <CardTitle className="text-lg">Recent Activity</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-3">
+                      <Activity className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">No recent activity</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-        {/* Mobile Tab Bar */}
-        <MobileTabBar 
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          stats={stats}
-        />
-      </div>
+          {activeTab === "messages" && <SimpleMessageCenter />}
+          {activeTab === "events" && <EventCalendar />}
+          {activeTab === "people" && <EmployeeManagement />}
+          {activeTab === "profile" && (
+            <div className="p-4 space-y-6">
+              <div className="flex items-center justify-center">
+                <ProfileMenu />
+              </div>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSignOut}
+                  variant="destructive"
+                  className="w-full max-w-sm touch-manipulation"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Mobile Tab Bar */}
+      <MobileTabBar 
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        stats={stats}
+      />
     </div>
   );
 };
