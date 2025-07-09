@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +17,7 @@ import EventCalendar from "@/components/EventCalendar";
 import ProfileMenu from "@/components/ProfileMenu";
 import EmployeeManagement from "@/components/EmployeeManagement";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { notificationService } from "@/services/notificationService";
 
 interface DashboardStats {
   total_messages: number;
@@ -60,13 +62,19 @@ const Index = () => {
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Check URL parameters for tab selection
+  // Check URL parameters for tab selection and handle shortcuts
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
     if (tab && ['dashboard', 'messages', 'events', 'employees', 'profile'].includes(tab)) {
       setActiveTab(tab);
     }
+  }, []);
+
+  // Initialize notifications when component mounts
+  useEffect(() => {
+    notificationService.initialize();
+    notificationService.requestPermission();
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
@@ -207,6 +215,23 @@ const Index = () => {
     }
   };
 
+  // Handle shortcut navigation
+  const handleShortcutClick = (shortcut: string) => {
+    const tabMap: { [key: string]: string } = {
+      'messages': 'messages',
+      'events': 'events',
+      'employees': 'employees'
+    };
+    
+    if (tabMap[shortcut]) {
+      setActiveTab(tabMap[shortcut]);
+      // Update URL to reflect the change
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tabMap[shortcut]);
+      window.history.pushState({}, '', url.toString());
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center safe-area-inset">
@@ -342,7 +367,10 @@ const Index = () => {
 
                 {/* Stats Cards - Mobile optimized with better spacing */}
                 <div className="grid grid-cols-2 gap-2 sm:gap-6">
-                  <Card className="hover:shadow-md transition-shadow">
+                  <Card 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleShortcutClick('messages')}
+                  >
                     <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
@@ -361,7 +389,10 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="hover:shadow-md transition-shadow">
+                  <Card 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleShortcutClick('events')}
+                  >
                     <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
@@ -376,7 +407,10 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="hover:shadow-md transition-shadow">
+                  <Card 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleShortcutClick('employees')}
+                  >
                     <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">

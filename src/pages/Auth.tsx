@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Mail, Lock, User, Eye, EyeOff, Building } from "lucide-react";
+import { Users, Mail, Lock, User, Eye, EyeOff, Building, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +27,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [departmentError, setDepartmentError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -43,15 +44,28 @@ const Auth = () => {
 
   const fetchDepartments = async () => {
     setLoadingDepartments(true);
+    setDepartmentError("");
+    
     try {
       console.log('Fetching departments...');
-      const { data, error } = await supabase
+      
+      // First check if departments table exists and has data
+      const { data, error, count } = await supabase
         .from('departments')
-        .select('id, name, description')
+        .select('id, name, description', { count: 'exact' })
         .order('name');
       
       if (error) {
         console.error('Error fetching departments:', error);
+        setDepartmentError("Failed to load departments. Please try again.");
+        
+        // If table doesn't exist, create some default departments
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+          console.log('Departments table may not exist, creating default departments...');
+          await createDefaultDepartments();
+          return;
+        }
+        
         toast({
           title: "Error",
           description: "Failed to load departments. Please refresh the page.",
@@ -60,10 +74,20 @@ const Auth = () => {
         return;
       }
 
-      console.log('Departments fetched:', data);
-      setDepartments(data || []);
+      console.log('Departments query result:', { data, count });
+      
+      if (!data || data.length === 0) {
+        console.log('No departments found, creating default departments...');
+        await createDefaultDepartments();
+        return;
+      }
+
+      console.log('Departments fetched successfully:', data);
+      setDepartments(data);
+      
     } catch (error) {
-      console.error('Error fetching departments:', error);
+      console.error('Unexpected error fetching departments:', error);
+      setDepartmentError("An unexpected error occurred while loading departments.");
       toast({
         title: "Error",
         description: "Failed to load departments. Please refresh the page.",
@@ -71,6 +95,44 @@ const Auth = () => {
       });
     } finally {
       setLoadingDepartments(false);
+    }
+  };
+
+  const createDefaultDepartments = async () => {
+    try {
+      console.log('Creating default departments...');
+      
+      const defaultDepartments = [
+        { name: 'Human Resources', description: 'HR Department' },
+        { name: 'Information Technology', description: 'IT Department' },
+        { name: 'Finance', description: 'Finance Department' },
+        { name: 'Operations', description: 'Operations Department' },
+        { name: 'Marketing', description: 'Marketing Department' },
+        { name: 'General Administration', description: 'General Admin' }
+      ];
+
+      const { data, error } = await supabase
+        .from('departments')
+        .insert(defaultDepartments)
+        .select();
+
+      if (error) {
+        console.error('Error creating default departments:', error);
+        setDepartmentError("Failed to initialize departments. Please contact support.");
+        return;
+      }
+
+      console.log('Default departments created:', data);
+      setDepartments(data || []);
+      
+      toast({
+        title: "Success",
+        description: "Departments have been initialized successfully.",
+      });
+      
+    } catch (error) {
+      console.error('Error creating default departments:', error);
+      setDepartmentError("Failed to initialize departments.");
     }
   };
 
@@ -249,6 +311,11 @@ const Auth = () => {
     setSelectedDepartment("");
   };
 
+  const handleRetryDepartments = () => {
+    setDepartmentError("");
+    fetchDepartments();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -303,36 +370,70 @@ const Auth = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="department">Department *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="department">Department *</Label>
+                    {departmentError && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRetryDepartments}
+                        className="h-6 px-2 text-xs"
+                        disabled={loadingDepartments}
+                      >
+                        {loadingDepartments ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                   <div className="relative">
                     <Building className="w-4 h-4 absolute left-3 top-3 text-gray-400 z-10" />
                     <Select 
                       value={selectedDepartment} 
                       onValueChange={setSelectedDepartment} 
-                      disabled={loading || loadingDepartments}
+                      disabled={loading || loadingDepartments || departmentError !== ""}
                     >
                       <SelectTrigger className="pl-10">
                         <SelectValue placeholder={
-                          loadingDepartments 
-                            ? "Loading departments..." 
-                            : departments.length === 0 
-                              ? "No departments available" 
-                              : "Select your department"
+                          departmentError 
+                            ? "Failed to load departments" 
+                            : loadingDepartments 
+                              ? "Loading departments..." 
+                              : departments.length === 0 
+                                ? "No departments available" 
+                                : "Select your department"
                         } />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-50">
                         {loadingDepartments ? (
                           <SelectItem value="loading" disabled>
-                            Loading departments...
+                            <div className="flex items-center space-x-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Loading departments...</span>
+                            </div>
+                          </SelectItem>
+                        ) : departmentError ? (
+                          <SelectItem value="error" disabled>
+                            <div className="flex flex-col">
+                              <span className="text-red-600 font-medium">Error loading departments</span>
+                              <span className="text-xs text-red-500">{departmentError}</span>
+                            </div>
                           </SelectItem>
                         ) : departments.length === 0 ? (
                           <SelectItem value="empty" disabled>
-                            No departments available
+                            <div className="flex flex-col">
+                              <span className="text-gray-600">No departments available</span>
+                              <span className="text-xs text-gray-500">Please contact administrator</span>
+                            </div>
                           </SelectItem>
                         ) : (
                           departments.map((dept) => (
                             <SelectItem key={dept.id} value={dept.id} className="cursor-pointer hover:bg-gray-50">
-                              <div className="flex flex-col">
+                              <div className="flex flex-col py-1">
                                 <span className="font-medium">{dept.name}</span>
                                 {dept.description && (
                                   <span className="text-xs text-gray-500">{dept.description}</span>
@@ -344,9 +445,15 @@ const Auth = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  {!loadingDepartments && departments.length === 0 && (
+                  {departmentError && (
                     <p className="text-xs text-red-500 mt-1">
-                      Unable to load departments. Please refresh the page or contact support.
+                      {departmentError}
+                    </p>
+                  )}
+                  {loadingDepartments && (
+                    <p className="text-xs text-blue-500 mt-1 flex items-center space-x-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Loading departments...</span>
                     </p>
                   )}
                 </div>
@@ -400,10 +507,14 @@ const Auth = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || (loadingDepartments && !isLogin)}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading || (!isLogin && (loadingDepartments || departmentError !== ""))}
+            >
               {loading ? (
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Please wait...</span>
                 </div>
               ) : (
@@ -426,9 +537,11 @@ const Auth = () => {
             </button>
           </div>
 
-          {!isLogin && loadingDepartments && (
+          {!isLogin && (loadingDepartments || departmentError) && (
             <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">Loading departments...</p>
+              <p className="text-xs text-gray-500">
+                {loadingDepartments ? "Loading departments..." : "Department selection is required for signup"}
+              </p>
             </div>
           )}
         </CardContent>
