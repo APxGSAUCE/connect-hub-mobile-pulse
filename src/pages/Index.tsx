@@ -4,15 +4,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   MessageSquare, 
   Calendar, 
   Users, 
   Home,
-  Bell,
   LogOut,
-  Plus,
   TrendingUp,
   Clock,
   CheckCircle
@@ -24,6 +21,11 @@ import SimpleMessageCenter from "@/components/SimpleMessageCenter";
 import EventCalendar from "@/components/EventCalendar";
 import EmployeeManagement from "@/components/EmployeeManagement";
 import ProfileMenu from "@/components/ProfileMenu";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import PWAHeader from "@/components/PWAHeader";
+import MobileTabBar from "@/components/MobileTabBar";
+import OfflineIndicator from "@/components/OfflineIndicator";
+import { usePWA } from "@/hooks/usePWA";
 
 interface DashboardStats {
   totalMessages: number;
@@ -44,6 +46,8 @@ const Index = () => {
     upcomingEvents: 0
   });
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pwa = usePWA();
 
   const activeTab = searchParams.get("tab") || "dashboard";
 
@@ -54,6 +58,15 @@ const Index = () => {
     }
     fetchDashboardStats();
   }, [user, navigate]);
+
+  // Add PWB-specific body class
+  useEffect(() => {
+    if (pwa.isStandalone) {
+      document.body.classList.add('pwa-standalone');
+    } else {
+      document.body.classList.remove('pwa-standalone');
+    }
+  }, [pwa.isStandalone]);
 
   const fetchDashboardStats = async () => {
     if (!user) return;
@@ -120,6 +133,7 @@ const Index = () => {
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
+    setSidebarOpen(false);
   };
 
   const handleSignOut = async () => {
@@ -169,16 +183,22 @@ const Index = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-background overflow-hidden ios-fix">
+      {/* Offline Indicator */}
+      <OfflineIndicator />
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
+
+      {/* Desktop Sidebar */}
       <div className="hidden md:flex md:w-64 md:flex-col">
-        <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r">
+        <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-card border-r border-border">
           <div className="flex items-center flex-shrink-0 px-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Home className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <Home className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">iSurve Portal</h1>
+              <h1 className="text-xl font-bold text-foreground">iSurve Portal</h1>
             </div>
           </div>
           
@@ -186,10 +206,10 @@ const Index = () => {
             <nav className="flex-1 px-4 space-y-2">
               <button
                 onClick={() => handleTabChange("dashboard")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
                   activeTab === "dashboard"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 <Home className="mr-3 h-5 w-5" />
@@ -198,58 +218,64 @@ const Index = () => {
               
               <button
                 onClick={() => handleTabChange("messages")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
                   activeTab === "messages"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 <MessageSquare className="mr-3 h-5 w-5" />
                 Messages
-                <Badge variant="secondary" className="ml-auto">
-                  {stats.totalMessages}
-                </Badge>
+                {stats.totalMessages > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.totalMessages}
+                  </Badge>
+                )}
               </button>
               
               <button
                 onClick={() => handleTabChange("events")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
                   activeTab === "events"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 <Calendar className="mr-3 h-5 w-5" />
                 Events
-                <Badge variant="secondary" className="ml-auto">
-                  {stats.upcomingEvents}
-                </Badge>
+                {stats.upcomingEvents > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.upcomingEvents}
+                  </Badge>
+                )}
               </button>
               
               <button
                 onClick={() => handleTabChange("people")}
-                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
                   activeTab === "people"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 <Users className="mr-3 h-5 w-5" />
                 People
-                <Badge variant="secondary" className="ml-auto">
-                  {stats.totalEmployees}
-                </Badge>
+                {stats.totalEmployees > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.totalEmployees}
+                  </Badge>
+                )}
               </button>
             </nav>
             
-            <div className="flex-shrink-0 p-4 border-t">
+            <div className="flex-shrink-0 p-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <ProfileMenu />
                 <Button
                   onClick={handleSignOut}
                   variant="ghost"
                   size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 touch-manipulation"
                 >
                   <LogOut className="w-4 h-4" />
                 </Button>
@@ -261,98 +287,49 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Mobile header */}
-        <div className="md:hidden bg-white shadow-sm border-b px-4 py-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-gray-900">iSurve Portal</h1>
-            <div className="flex items-center space-x-2">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <ProfileMenu />
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        <div className="md:hidden bg-white border-b">
-          <nav className="flex overflow-x-auto">
-            <button
-              onClick={() => handleTabChange("dashboard")}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "dashboard"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Home className="w-4 h-4 mx-auto mb-1" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => handleTabChange("messages")}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "messages"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 mx-auto mb-1" />
-              Messages
-            </button>
-            <button
-              onClick={() => handleTabChange("events")}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "events"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Calendar className="w-4 h-4 mx-auto mb-1" />
-              Events
-            </button>
-            <button
-              onClick={() => handleTabChange("people")}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "people"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Users className="w-4 h-4 mx-auto mb-1" />
-              People
-            </button>
-          </nav>
-        </div>
+        {/* Mobile Header */}
+        <PWAHeader 
+          title={
+            activeTab === "dashboard" ? "Dashboard" :
+            activeTab === "messages" ? "Messages" :
+            activeTab === "events" ? "Events" :
+            activeTab === "people" ? "People" : "iSurve Portal"
+          }
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+          showSearch={activeTab === "messages" || activeTab === "people"}
+        />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-background pb-20 md:pb-0">
           <div className="h-full">
             {activeTab === "dashboard" && (
               <div className="p-4 md:p-6 space-y-6">
                 {/* Welcome Section */}
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-2xl font-bold text-foreground">
                     Welcome back, {user.user_metadata?.first_name || user.email}!
                   </h2>
-                  <p className="text-gray-600">Here's what's happening in your organization today.</p>
+                  <p className="text-muted-foreground">Here's what's happening in your organization today.</p>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="touch-manipulation">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Messages</CardTitle>
+                      <CardTitle className="text-sm font-medium">Messages</CardTitle>
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{stats.totalMessages}</div>
                       <p className="text-xs text-muted-foreground">
-                        Across all conversations
+                        All conversations
                       </p>
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="touch-manipulation">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
+                      <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
                       <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -363,35 +340,35 @@ const Index = () => {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="touch-manipulation">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+                      <CardTitle className="text-sm font-medium">Events</CardTitle>
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{stats.totalEvents}</div>
                       <p className="text-xs text-muted-foreground">
-                        All scheduled events
+                        Total scheduled
                       </p>
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="touch-manipulation">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Team Members</CardTitle>
+                      <CardTitle className="text-sm font-medium">Team</CardTitle>
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{stats.totalEmployees}</div>
                       <p className="text-xs text-muted-foreground">
-                        Active employees
+                        Active members
                       </p>
                     </CardContent>
                   </Card>
                 </div>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className="touch-manipulation">
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
                     <CardDescription>
@@ -404,15 +381,15 @@ const Index = () => {
                         <button
                           key={index}
                           onClick={action.action}
-                          className="p-4 border rounded-lg hover:bg-gray-50 transition-colors text-left group"
+                          className="p-4 border border-border rounded-lg hover:bg-accent transition-colors text-left group touch-manipulation"
                         >
                           <div className="flex items-start space-x-3">
                             <div className={`p-2 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
                               <action.icon className="w-5 h-5" />
                             </div>
                             <div>
-                              <h3 className="font-medium text-gray-900">{action.title}</h3>
-                              <p className="text-sm text-gray-600">{action.description}</p>
+                              <h3 className="font-medium text-foreground">{action.title}</h3>
+                              <p className="text-sm text-muted-foreground">{action.description}</p>
                             </div>
                           </div>
                         </button>
@@ -428,6 +405,13 @@ const Index = () => {
             {activeTab === "people" && <EmployeeManagement />}
           </div>
         </main>
+
+        {/* Mobile Tab Bar */}
+        <MobileTabBar 
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          stats={stats}
+        />
       </div>
     </div>
   );
