@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,41 +49,50 @@ const Auth = () => {
     try {
       console.log('Fetching departments...');
       
-      const { data, error } = await supabase
+      // First check if departments table exists and has data
+      const { data, error, count } = await supabase
         .from('departments')
-        .select('id, name, description')
+        .select('id, name, description', { count: 'exact' })
         .order('name');
       
       if (error) {
         console.error('Error fetching departments:', error);
-        throw error;
+        setDepartmentError("Failed to load departments. Please try again.");
+        
+        // If table doesn't exist, create some default departments
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+          console.log('Departments table may not exist, creating default departments...');
+          await createDefaultDepartments();
+          return;
+        }
+        
+        toast({
+          title: "Error",
+          description: "Failed to load departments. Please refresh the page.",
+          variant: "destructive"
+        });
+        return;
       }
 
-      console.log('Departments fetched:', data);
+      console.log('Departments query result:', { data, count });
       
       if (!data || data.length === 0) {
-        console.log('No departments found, creating defaults...');
+        console.log('No departments found, creating default departments...');
         await createDefaultDepartments();
         return;
       }
 
+      console.log('Departments fetched successfully:', data);
       setDepartments(data);
       
     } catch (error) {
-      console.error('Error in fetchDepartments:', error);
-      setDepartmentError("Failed to load departments. Please try again.");
-      
-      // Try to create default departments as fallback
-      try {
-        await createDefaultDepartments();
-      } catch (createError) {
-        console.error('Failed to create default departments:', createError);
-        toast({
-          title: "Error",
-          description: "Failed to initialize departments. Please contact support.",
-          variant: "destructive"
-        });
-      }
+      console.error('Unexpected error fetching departments:', error);
+      setDepartmentError("An unexpected error occurred while loading departments.");
+      toast({
+        title: "Error",
+        description: "Failed to load departments. Please refresh the page.",
+        variant: "destructive"
+      });
     } finally {
       setLoadingDepartments(false);
     }
@@ -101,30 +111,24 @@ const Auth = () => {
         { name: 'General Administration', description: 'General Admin' }
       ];
 
-      // Try to insert each department individually to handle conflicts
-      const createdDepartments = [];
-      for (const dept of defaultDepartments) {
-        const { data, error } = await supabase
-          .from('departments')
-          .insert(dept)
-          .select()
-          .single();
+      const { data, error } = await supabase
+        .from('departments')
+        .insert(defaultDepartments)
+        .select();
 
-        if (!error && data) {
-          createdDepartments.push(data);
-        }
+      if (error) {
+        console.error('Error creating default departments:', error);
+        setDepartmentError("Failed to initialize departments. Please contact support.");
+        return;
       }
 
-      if (createdDepartments.length > 0) {
-        console.log('Default departments created:', createdDepartments);
-        setDepartments(createdDepartments);
-        setDepartmentError("");
-        
-        toast({
-          title: "Success",
-          description: "Departments have been initialized successfully.",
-        });
-      }
+      console.log('Default departments created:', data);
+      setDepartments(data || []);
+      
+      toast({
+        title: "Success",
+        description: "Departments have been initialized successfully.",
+      });
       
     } catch (error) {
       console.error('Error creating default departments:', error);

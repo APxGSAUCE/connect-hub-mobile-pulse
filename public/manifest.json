@@ -1,32 +1,16 @@
 
 {
-  "name": "iSurve Portal - Employee Collaboration Platform",
-  "short_name": "iSurve Portal",
-  "description": "Professional employee collaboration and communication platform for modern teams",
+  "name": "One Ilocos Sur Portal",
+  "short_name": "One Ilocos Sur",
+  "description": "Employee collaboration and communication platform",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#3b82f6",
-  "background_color": "#ffffff",
+  "background_color": "#f8fafc",
   "scope": "/",
   "lang": "en-US",
-  "categories": ["business", "productivity", "social", "communication"],
-  "screenshots": [
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "iSurve Portal Dashboard - Wide View"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512", 
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "iSurve Portal Mobile View"
-    }
-  ],
+  "categories": ["business", "productivity", "social"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -43,9 +27,9 @@
   ],
   "shortcuts": [
     {
-      "name": "New Message",
-      "short_name": "Message",
-      "description": "Start a new conversation",
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "Open messages directly",
       "url": "/?tab=messages",
       "icons": [
         {
@@ -55,9 +39,9 @@
       ]
     },
     {
-      "name": "Calendar",
+      "name": "Events",
       "short_name": "Events", 
-      "description": "View upcoming events",
+      "description": "Open events directly",
       "url": "/?tab=events",
       "icons": [
         {
@@ -67,10 +51,10 @@
       ]
     },
     {
-      "name": "Team Directory",
+      "name": "Team",
       "short_name": "Team",
-      "description": "Browse team members",
-      "url": "/?tab=people", 
+      "description": "View team members",
+      "url": "/?tab=employees", 
       "icons": [
         {
           "src": "/icon-192.png",
@@ -84,31 +68,15 @@
   "edge_side_panel": {
     "preferred_width": 400
   },
+  "screenshots": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "One Ilocos Sur Portal Dashboard"
+    }
+  ],
   "display_override": ["window-controls-overlay", "minimal-ui", "standalone", "browser"],
-  "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
-  "file_handlers": [
-    {
-      "action": "/",
-      "accept": {
-        "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
-        "text/*": [".txt", ".md"],
-        "application/pdf": [".pdf"]
-      }
-    }
-  ],
-  "protocol_handlers": [
-    {
-      "protocol": "mailto",
-      "url": "/?email=%s"
-    }
-  ],
-  "share_target": {
-    "action": "/",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
 }
