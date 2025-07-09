@@ -39,11 +39,7 @@ class NotificationService {
     await this.showNotification(`New message from ${senderName}`, {
       body: message,
       tag: 'message',
-      requireInteraction: true,
-      actions: [
-        { action: 'reply', title: 'Reply' },
-        { action: 'view', title: 'View' }
-      ]
+      requireInteraction: true
     });
   }
 

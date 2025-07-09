@@ -108,19 +108,27 @@ const SimpleMessageCenter = () => {
             .select('*', { count: 'exact', head: true })
             .eq('group_id', group.id);
 
-          // Get last message with sender info
+          // Get last message with sender info using separate queries
           const { data: lastMessageData } = await supabase
             .from('messages')
-            .select(`
-              content,
-              created_at,
-              sender_id,
-              profiles!messages_sender_id_fkey(first_name, last_name, email)
-            `)
+            .select('content, created_at, sender_id')
             .eq('group_id', group.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
+
+          let senderName = 'Unknown';
+          if (lastMessageData) {
+            const { data: senderData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email')
+              .eq('id', lastMessageData.sender_id)
+              .single();
+
+            if (senderData) {
+              senderName = `${senderData.first_name || ''} ${senderData.last_name || ''}`.trim() || senderData.email || 'Unknown';
+            }
+          }
 
           return {
             ...group,
@@ -128,9 +136,7 @@ const SimpleMessageCenter = () => {
             last_message: lastMessageData ? {
               content: lastMessageData.content,
               created_at: lastMessageData.created_at,
-              sender_name: lastMessageData.profiles
-                ? `${lastMessageData.profiles.first_name || ''} ${lastMessageData.profiles.last_name || ''}`.trim() || lastMessageData.profiles.email || 'Unknown'
-                : 'Unknown'
+              sender_name: senderName
             } : undefined
           };
         })
@@ -159,29 +165,35 @@ const SimpleMessageCenter = () => {
       setMessagesLoading(true);
       console.log('Fetching messages for group:', groupId);
 
-      const { data: messagesData, error } = await supabase
+      // First fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select(`
-          id,
-          content,
-          created_at,
-          sender_id,
-          group_id,
-          profiles!messages_sender_id_fkey(first_name, last_name, email)
-        `)
+        .select('id, content, created_at, sender_id, group_id')
         .eq('group_id', groupId)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError);
+        throw messagesError;
       }
 
-      const formattedMessages = (messagesData || []).map(msg => ({
-        ...msg,
-        sender: msg.profiles
-      }));
-      setMessages(formattedMessages);
+      // Then fetch sender info for each message
+      const messagesWithSender = await Promise.all(
+        (messagesData || []).map(async (message) => {
+          const { data: senderData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', message.sender_id)
+            .single();
+
+          return {
+            ...message,
+            sender: senderData
+          };
+        })
+      );
+
+      setMessages(messagesWithSender);
 
     } catch (error) {
       console.error('Error fetching messages:', error);
