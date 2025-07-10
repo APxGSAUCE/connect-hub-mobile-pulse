@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
+import { MessageStatus } from "@/components/MessageStatus";
 
 interface ChatGroup {
   id: string;
@@ -34,6 +35,7 @@ interface Message {
   created_at: string;
   sender_id: string;
   group_id: string;
+  message_status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   sender?: {
     first_name: string | null;
     last_name: string | null;
@@ -165,10 +167,10 @@ const SimpleMessageCenter = () => {
       setMessagesLoading(true);
       console.log('Fetching messages for group:', groupId);
 
-      // First fetch messages
+      // First fetch messages with better error handling
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
-        .select('id, content, created_at, sender_id, group_id')
+        .select('id, content, created_at, sender_id, group_id, message_type')
         .eq('group_id', groupId)
         .order('created_at', { ascending: true });
 
@@ -177,19 +179,46 @@ const SimpleMessageCenter = () => {
         throw messagesError;
       }
 
-      // Then fetch sender info for each message
+      // Then fetch sender info for each message with better error handling
       const messagesWithSender = await Promise.all(
         (messagesData || []).map(async (message) => {
-          const { data: senderData } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, email')
-            .eq('id', message.sender_id)
-            .single();
+          try {
+            const { data: senderData, error: senderError } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email')
+              .eq('id', message.sender_id)
+              .maybeSingle(); // Use maybeSingle to handle missing profiles
 
-          return {
-            ...message,
-            sender: senderData
-          };
+            if (senderError) {
+              console.warn('Error fetching sender for message:', message.id, senderError);
+            }
+
+            // Determine message status (simplified implementation)
+            const message_status = message.sender_id === user.id 
+              ? 'sent' as const 
+              : 'delivered' as const;
+
+            return {
+              ...message,
+              message_status,
+              sender: senderData || {
+                first_name: null,
+                last_name: null,
+                email: 'Unknown User'
+              }
+            };
+          } catch (error) {
+            console.warn('Error processing message:', message.id, error);
+            return {
+              ...message,
+              message_status: 'sent' as const,
+              sender: {
+                first_name: null,
+                last_name: null,
+                email: 'Unknown User'
+              }
+            };
+          }
         })
       );
 
@@ -199,7 +228,7 @@ const SimpleMessageCenter = () => {
       console.error('Error fetching messages:', error);
       toast({
         title: "Error",
-        description: "Failed to load messages.",
+        description: "Failed to load messages. Please check your connection and try again.",
         variant: "destructive"
       });
     } finally {
@@ -631,16 +660,24 @@ const SimpleMessageCenter = () => {
                                   {getSenderName(message)}
                                 </p>
                               )}
-                              <p className="text-sm">{message.content}</p>
-                              <p
-                                className={`text-xs mt-1 ${
-                                  message.sender_id === user?.id
-                                    ? 'text-blue-100'
-                                    : 'text-gray-500'
-                                }`}
-                              >
-                                {new Date(message.created_at).toLocaleTimeString()}
-                              </p>
+                               <p className="text-sm">{message.content}</p>
+                               <div className="flex items-center justify-between mt-1">
+                                 <p
+                                   className={`text-xs ${
+                                     message.sender_id === user?.id
+                                       ? 'text-blue-100'
+                                       : 'text-gray-500'
+                                   }`}
+                                 >
+                                   {new Date(message.created_at).toLocaleTimeString()}
+                                 </p>
+                                 {message.sender_id === user?.id && message.message_status && (
+                                   <MessageStatus 
+                                     status={message.message_status} 
+                                     className={message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}
+                                   />
+                                 )}
+                               </div>
                             </div>
                           </div>
                         ))}

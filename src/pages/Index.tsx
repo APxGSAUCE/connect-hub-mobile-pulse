@@ -215,20 +215,31 @@ const Index = () => {
     }
   };
 
-  // Handle shortcut navigation
+  // Handle shortcut navigation with improved functionality
   const handleShortcutClick = (shortcut: string) => {
     const tabMap: { [key: string]: string } = {
       'messages': 'messages',
       'events': 'events',
-      'employees': 'employees'
+      'employees': 'employees',
+      'profile': 'profile'
     };
     
     if (tabMap[shortcut]) {
       setActiveTab(tabMap[shortcut]);
+      
       // Update URL to reflect the change
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tabMap[shortcut]);
       window.history.pushState({}, '', url.toString());
+      
+      // Show toast for navigation feedback
+      toast({
+        title: "Navigation",
+        description: `Switched to ${shortcut.charAt(0).toUpperCase() + shortcut.slice(1)} tab`,
+      });
+      
+      // Scroll to top of content
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
