@@ -49,23 +49,14 @@ const Auth = () => {
     try {
       console.log('Fetching departments...');
       
-      // First check if departments table exists and has data
-      const { data, error, count } = await supabase
+      const { data, error } = await supabase
         .from('departments')
-        .select('id, name, description', { count: 'exact' })
+        .select('id, name, description')
         .order('name');
       
       if (error) {
         console.error('Error fetching departments:', error);
         setDepartmentError("Failed to load departments. Please try again.");
-        
-        // If table doesn't exist, create some default departments
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          console.log('Departments table may not exist, creating default departments...');
-          await createDefaultDepartments();
-          return;
-        }
-        
         toast({
           title: "Error",
           description: "Failed to load departments. Please refresh the page.",
@@ -74,16 +65,8 @@ const Auth = () => {
         return;
       }
 
-      console.log('Departments query result:', { data, count });
-      
-      if (!data || data.length === 0) {
-        console.log('No departments found, creating default departments...');
-        await createDefaultDepartments();
-        return;
-      }
-
       console.log('Departments fetched successfully:', data);
-      setDepartments(data);
+      setDepartments(data || []);
       
     } catch (error) {
       console.error('Unexpected error fetching departments:', error);
@@ -98,43 +81,6 @@ const Auth = () => {
     }
   };
 
-  const createDefaultDepartments = async () => {
-    try {
-      console.log('Creating default departments...');
-      
-      const defaultDepartments = [
-        { name: 'Human Resources', description: 'HR Department' },
-        { name: 'Information Technology', description: 'IT Department' },
-        { name: 'Finance', description: 'Finance Department' },
-        { name: 'Operations', description: 'Operations Department' },
-        { name: 'Marketing', description: 'Marketing Department' },
-        { name: 'General Administration', description: 'General Admin' }
-      ];
-
-      const { data, error } = await supabase
-        .from('departments')
-        .insert(defaultDepartments)
-        .select();
-
-      if (error) {
-        console.error('Error creating default departments:', error);
-        setDepartmentError("Failed to initialize departments. Please contact support.");
-        return;
-      }
-
-      console.log('Default departments created:', data);
-      setDepartments(data || []);
-      
-      toast({
-        title: "Success",
-        description: "Departments have been initialized successfully.",
-      });
-      
-    } catch (error) {
-      console.error('Error creating default departments:', error);
-      setDepartmentError("Failed to initialize departments.");
-    }
-  };
 
   const validateForm = () => {
     if (!email.trim()) {

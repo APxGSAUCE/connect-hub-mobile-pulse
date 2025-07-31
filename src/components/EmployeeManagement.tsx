@@ -75,32 +75,18 @@ const EmployeeManagement = () => {
     try {
       console.log('Fetching departments...');
       
-      const { data, error, count } = await supabase
+      const { data, error } = await supabase
         .from('departments')
-        .select('id, name, description', { count: 'exact' })
+        .select('id, name, description')
         .order('name');
 
       if (error) {
         console.error('Error fetching departments:', error);
-        
-        // If table doesn't exist, create some default departments
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          console.log('Departments table may not exist, creating default departments...');
-          await createDefaultDepartments();
-          return;
-        }
         throw error;
       }
 
       console.log('Departments fetched:', data);
-      
-      if (!data || data.length === 0) {
-        console.log('No departments found, creating defaults...');
-        await createDefaultDepartments();
-        return;
-      }
-
-      setDepartments(data);
+      setDepartments(data || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
       toast({
@@ -111,41 +97,6 @@ const EmployeeManagement = () => {
     }
   };
 
-  const createDefaultDepartments = async () => {
-    try {
-      console.log('Creating default departments...');
-      
-      const defaultDepartments = [
-        { name: 'Human Resources', description: 'HR Department' },
-        { name: 'Information Technology', description: 'IT Department' },
-        { name: 'Finance', description: 'Finance Department' },
-        { name: 'Operations', description: 'Operations Department' },
-        { name: 'Marketing', description: 'Marketing Department' },
-        { name: 'General Administration', description: 'General Admin' }
-      ];
-
-      const { data, error } = await supabase
-        .from('departments')
-        .insert(defaultDepartments)
-        .select();
-
-      if (error) {
-        console.error('Error creating default departments:', error);
-        return;
-      }
-
-      console.log('Default departments created:', data);
-      setDepartments(data || []);
-      
-      toast({
-        title: "Success",
-        description: "Departments have been initialized successfully.",
-      });
-      
-    } catch (error) {
-      console.error('Error creating default departments:', error);
-    }
-  };
 
   const updateEmployeeStatus = async (employeeId: string, status: Employee['status']) => {
     try {
