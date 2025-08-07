@@ -437,15 +437,15 @@ const ProfileMenu = () => {
               <Label htmlFor="department">Department</Label>
               {isEditing ? (
                 <Select
-                  value={profileData.department_id}
-                  onValueChange={(value) => setProfileData({ ...profileData, department_id: value })}
+                  value={profileData.department_id || "none"}
+                  onValueChange={(value) => setProfileData({ ...profileData, department_id: value === "none" ? "" : value })}
                   disabled={loading}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No department</SelectItem>
+                    <SelectItem value="none">No department</SelectItem>
                     {departments.map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
