@@ -22,6 +22,7 @@ interface ChatGroup {
   group_type: string;
   created_at: string;
   member_count?: number;
+  other_user_name?: string;
   last_message?: {
     content: string;
     created_at: string;
@@ -111,6 +112,26 @@ const SimpleMessageCenter = () => {
             .select('*', { count: 'exact', head: true })
             .eq('group_id', group.id);
 
+          // For direct messages, get the other user's name
+          let otherUserName = undefined;
+          if (group.group_type === 'direct') {
+            const { data: otherMember } = await supabase
+              .from('chat_group_members')
+              .select(`
+                user_id,
+                profiles!inner(first_name, last_name, email)
+              `)
+              .eq('group_id', group.id)
+              .neq('user_id', user.id)
+              .limit(1)
+              .single();
+
+            if (otherMember?.profiles) {
+              const profile = otherMember.profiles as any;
+              otherUserName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email || 'Unknown User';
+            }
+          }
+
           // Get last message with sender info using separate queries
           const { data: lastMessageData } = await supabase
             .from('messages')
@@ -136,6 +157,7 @@ const SimpleMessageCenter = () => {
           return {
             ...group,
             member_count: memberCount || 0,
+            other_user_name: otherUserName,
             last_message: lastMessageData ? {
               content: lastMessageData.content,
               created_at: lastMessageData.created_at,

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +27,13 @@ interface Event {
   created_at: string;
 }
 
+interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}
+
 const EventCalendar = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -41,6 +49,8 @@ const EventCalendar = () => {
     location: '',
     event_type: 'meeting'
   });
+  const [employees, setEmployees] = useState<Profile[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   const fetchEvents = async () => {
     if (!user) return;
@@ -48,7 +58,6 @@ const EventCalendar = () => {
     try {
       setLoading(true);
       
-      // Simplified query without the problematic join
       const { data: eventsData, error } = await supabase
         .from('events')
         .select('*')
@@ -74,9 +83,24 @@ const EventCalendar = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchEvents();
+      fetchEmployees();
     }
   }, [user]);
 
@@ -97,7 +121,7 @@ const EventCalendar = () => {
 
     if (new Date(newEvent.start_date) >= new Date(newEvent.end_date)) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "End date must be after start date",
         variant: "destructive"
       });
@@ -105,136 +129,184 @@ const EventCalendar = () => {
     }
 
     try {
+      setLoading(true);
+
+      const eventData = {
+        title: newEvent.title,
+        description: newEvent.description || null,
+        start_date: newEvent.start_date,
+        end_date: newEvent.end_date,
+        location: newEvent.location || null,
+        event_type: newEvent.event_type,
+        created_by: user.id
+      };
+
       if (editingEvent) {
+        // Update existing event
         const { error } = await supabase
           .from('events')
-          .update({
-            title: newEvent.title,
-            description: newEvent.description || null,
-            start_date: newEvent.start_date,
-            end_date: newEvent.end_date,
-            location: newEvent.location || null,
-            event_type: newEvent.event_type,
-            updated_at: new Date().toISOString()
-          })
+          .update(eventData)
           .eq('id', editingEvent.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating event:', error);
+          throw error;
+        }
 
-        toast({
-          title: "Success",
-          description: "Event updated successfully!",
-        });
-        
-        setEditingEvent(null);
-      } else {
-        const { data: eventData, error: eventError } = await supabase
-          .from('events')
-          .insert({
-            title: newEvent.title,
-            description: newEvent.description || null,
-            start_date: newEvent.start_date,
-            end_date: newEvent.end_date,
-            location: newEvent.location || null,
-            event_type: newEvent.event_type,
-            created_by: user.id
-          })
-          .select()
-          .single();
+        // Update participants
+        if (selectedParticipants.length > 0) {
+          // Remove existing participants
+          await supabase
+            .from('event_participants')
+            .delete()
+            .eq('event_id', editingEvent.id);
 
-        if (eventError) throw eventError;
+          // Add new participants
+          const participantData = selectedParticipants.map(participantId => ({
+            event_id: editingEvent.id,
+            user_id: participantId,
+            status: 'invited'
+          }));
 
-        // Create participant entry for the creator
-        const { error: participantError } = await supabase
-          .from('event_participants')
-          .insert({
-            event_id: eventData.id,
-            user_id: user.id,
-            status: 'accepted'
-          });
+          const { error: participantError } = await supabase
+            .from('event_participants')
+            .insert(participantData);
 
-        if (participantError) {
-          console.warn('Could not add participant:', participantError);
-          // Don't throw error as event creation was successful
+          if (participantError) {
+            console.error('Error updating participants:', participantError);
+          }
         }
 
         toast({
           title: "Success",
-          description: "Event created successfully!",
+          description: "Event updated successfully"
+        });
+      } else {
+        // Create new event
+        const { data, error } = await supabase
+          .from('events')
+          .insert([eventData])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating event:', error);
+          throw error;
+        }
+
+        console.log('Event created successfully:', data);
+
+        // Add participants to the event
+        if (selectedParticipants.length > 0) {
+          const participantData = selectedParticipants.map(participantId => ({
+            event_id: data.id,
+            user_id: participantId,
+            status: 'invited'
+          }));
+
+          const { error: participantError } = await supabase
+            .from('event_participants')
+            .insert(participantData);
+
+          if (participantError) {
+            console.error('Error adding participants:', participantError);
+            // Don't throw error here as the event was created successfully
+          }
+        }
+
+        toast({
+          title: "Success",
+          description: "Event created successfully"
         });
       }
 
-      setNewEvent({
-        title: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        location: '',
-        event_type: 'meeting'
-      });
-      setIsDialogOpen(false);
-      fetchEvents(); // Refresh events list
+      fetchEvents();
+      closeDialog();
 
     } catch (error) {
-      console.error('Error creating/updating event:', error);
+      console.error('Error saving event:', error);
       toast({
         title: "Error",
-        description: "Failed to save event. Please try again.",
+        description: "Failed to save event",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     if (!user) return;
 
+    if (!confirm('Are you sure you want to delete this event?')) {
+      return;
+    }
+
     try {
-      // Delete participants first (if any)
+      // Delete participants first
       await supabase
         .from('event_participants')
         .delete()
         .eq('event_id', eventId);
 
+      // Delete the event
       const { error } = await supabase
         .from('events')
         .delete()
-        .eq('id', eventId);
+        .eq('id', eventId)
+        .eq('created_by', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting event:', error);
+        throw error;
+      }
 
       toast({
         title: "Success",
-        description: "Event deleted successfully!",
+        description: "Event deleted successfully"
       });
 
-      fetchEvents(); // Refresh events list
-
+      fetchEvents();
     } catch (error) {
       console.error('Error deleting event:', error);
       toast({
         title: "Error",
-        description: "Failed to delete event.",
+        description: "Failed to delete event",
         variant: "destructive"
       });
     }
   };
 
-  const handleEditEvent = (event: Event) => {
+  const handleEditEvent = async (event: Event) => {
     setEditingEvent(event);
     setNewEvent({
       title: event.title,
       description: event.description || '',
-      start_date: event.start_date.slice(0, 16),
-      end_date: event.end_date.slice(0, 16),
+      start_date: event.start_date,
+      end_date: event.end_date,
       location: event.location || '',
       event_type: event.event_type
     });
+
+    // Fetch existing participants
+    try {
+      const { data: participants, error } = await supabase
+        .from('event_participants')
+        .select('user_id')
+        .eq('event_id', event.id);
+
+      if (!error && participants) {
+        setSelectedParticipants(participants.map(p => p.user_id));
+      }
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+    }
+
     setIsDialogOpen(true);
   };
 
   const closeDialog = () => {
     setIsDialogOpen(false);
-    setEditingEvent(null);
     setNewEvent({
       title: '',
       description: '',
@@ -243,6 +315,8 @@ const EventCalendar = () => {
       location: '',
       event_type: 'meeting'
     });
+    setSelectedParticipants([]);
+    setEditingEvent(null);
   };
 
   const getEventStatus = (startDate: string, endDate: string) => {
@@ -262,8 +336,23 @@ const EventCalendar = () => {
       case 'workshop': return 'bg-purple-100 text-purple-800';
       case 'conference': return 'bg-green-100 text-green-800';
       case 'social': return 'bg-yellow-100 text-yellow-800';
+      case 'training': return 'bg-indigo-100 text-indigo-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const toggleParticipant = (participantId: string) => {
+    setSelectedParticipants(prev => 
+      prev.includes(participantId) 
+        ? prev.filter(id => id !== participantId)
+        : [...prev, participantId]
+    );
+  };
+
+  const getEmployeeName = (employee: Profile) => {
+    return employee.first_name && employee.last_name 
+      ? `${employee.first_name} ${employee.last_name}`
+      : employee.email || 'Unknown User';
   };
 
   if (loading) {
@@ -290,7 +379,7 @@ const EventCalendar = () => {
               Create Event
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto mx-auto">
+          <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto mx-auto">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
                 {editingEvent ? 'Edit Event' : 'Create New Event'}
@@ -307,7 +396,7 @@ const EventCalendar = () => {
                   placeholder="Enter event title"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="text-base" // Prevent zoom on iOS
+                  className="text-base"
                 />
               </div>
               
@@ -358,19 +447,58 @@ const EventCalendar = () => {
 
               <div className="grid gap-2">
                 <Label htmlFor="event_type" className="text-sm font-medium">Event Type</Label>
-                <select
-                  id="event_type"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background"
+                <Select
                   value={newEvent.event_type}
-                  onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
                 >
-                  <option value="meeting">Meeting</option>
-                  <option value="workshop">Workshop</option>
-                  <option value="conference">Conference</option>
-                  <option value="social">Social</option>
-                  <option value="training">Training</option>
-                  <option value="other">Other</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="conference">Conference</SelectItem>
+                    <SelectItem value="social">Social</SelectItem>
+                    <SelectItem value="training">Training</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Participants Selection */}
+              <div className="grid gap-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Event Participants
+                </Label>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
+                  {employees.length > 0 ? (
+                    <div className="space-y-2">
+                      {employees.map((employee) => (
+                        <div key={employee.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={employee.id}
+                            checked={selectedParticipants.includes(employee.id)}
+                            onCheckedChange={() => toggleParticipant(employee.id)}
+                          />
+                          <label
+                            htmlFor={employee.id}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {getEmployeeName(employee)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No employees found</p>
+                  )}
+                </div>
+                {selectedParticipants.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {selectedParticipants.length} participant(s) selected
+                  </p>
+                )}
               </div>
             </div>
             
@@ -378,15 +506,22 @@ const EventCalendar = () => {
               <Button variant="outline" onClick={closeDialog} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={handleCreateOrUpdateEvent} className="w-full sm:w-auto">
-                {editingEvent ? 'Update Event' : 'Create Event'}
+              <Button onClick={handleCreateOrUpdateEvent} className="w-full sm:w-auto" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {editingEvent ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingEvent ? 'Update Event' : 'Create Event'
+                )}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Events List - Mobile optimized */}
+      {/* Events List */}
       <div className="space-y-3 sm:space-y-4">
         {events.length > 0 ? (
           events.map((event) => {
@@ -426,7 +561,7 @@ const EventCalendar = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteEvent(event.id)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -437,21 +572,25 @@ const EventCalendar = () => {
                 </CardHeader>
                 
                 <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div>{format(parseISO(event.start_date), 'MMM dd, yyyy HH:mm')}</div>
-                        <div>to {format(parseISO(event.end_date), 'MMM dd, yyyy HH:mm')}</div>
-                      </div>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        {format(parseISO(event.start_date), 'PPP p')} - {format(parseISO(event.end_date), 'PPP p')}
+                      </span>
                     </div>
                     
                     {event.location && (
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
-                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="truncate">{event.location}</span>
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-4 h-4" />
+                        <span>{event.location}</span>
                       </div>
                     )}
+                    
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4" />
+                      <span>Created by {user?.id === event.created_by ? 'You' : 'Another user'}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -459,14 +598,18 @@ const EventCalendar = () => {
           })
         ) : (
           <Card>
-            <CardContent className="p-8 sm:p-12 text-center">
-              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No events yet</h3>
-              <p className="text-sm text-gray-600 mb-4">Create your first event to get started</p>
-              <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Event
-              </Button>
+            <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+              <Calendar className="w-12 h-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
+              <p className="text-gray-500 mb-4">Create your first event to get started</p>
+              <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Event
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
             </CardContent>
           </Card>
         )}

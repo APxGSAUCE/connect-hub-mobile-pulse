@@ -68,39 +68,41 @@ class NotificationService {
     return false;
   }
 
-  async showNotification(title: string, options?: NotificationOptions) {
+  async showNotification(title: string, options?: any) {
     if (!this.permissionGranted) {
       await this.requestPermission();
     }
     
     if (this.permissionGranted) {
-      const notificationOptions: NotificationOptions = {
+      const baseOptions: NotificationOptions = {
         icon: '/icon-192.png',
         badge: '/icon-192.png',
         dir: 'auto',
         lang: 'en',
         silent: false,
-        ...options
+        body: options?.body,
+        tag: options?.tag,
+        requireInteraction: options?.requireInteraction || false,
+        data: options?.data
       };
-
-      // Add vibrate only if supported and we're using service worker
-      const enhancedOptions = this.registration && this.registration.active ? {
-        ...notificationOptions,
-        vibrate: [200, 100, 200]
-      } : notificationOptions;
 
       try {
         if (this.registration && this.registration.active) {
-          await this.registration.showNotification(title, enhancedOptions);
+          // Use service worker notifications for advanced features
+          const swOptions = {
+            ...baseOptions,
+            ...options // This allows actions, vibrate, etc. for service worker
+          };
+          await this.registration.showNotification(title, swOptions);
         } else {
           // Fallback to regular notification if service worker isn't available
-          new Notification(title, notificationOptions);
+          new Notification(title, baseOptions);
         }
       } catch (error) {
         console.error('Error showing notification:', error);
         // Fallback to regular notification
         try {
-          new Notification(title, notificationOptions);
+          new Notification(title, baseOptions);
         } catch (fallbackError) {
           console.error('Fallback notification also failed:', fallbackError);
         }
@@ -111,10 +113,22 @@ class NotificationService {
   async showMessageNotification(senderName: string, message: string) {
     // Only show notification if app is not in focus
     if (document.hidden || !document.hasFocus()) {
-      await this.showNotification(`💬 ${senderName}`, {
+      await this.showNotification(`💬 ${senderName} sent you a message`, {
         body: message,
         tag: 'message',
-        requireInteraction: false,
+        requireInteraction: true,
+        actions: [
+          {
+            action: 'reply',
+            title: 'Reply',
+            icon: '/icon-192.png'
+          },
+          {
+            action: 'mark-read',
+            title: 'Mark as Read',
+            icon: '/icon-192.png'
+          }
+        ],
         data: {
           type: 'message',
           sender: senderName,
@@ -125,10 +139,22 @@ class NotificationService {
   }
 
   async showEventNotification(eventTitle: string, startTime: string) {
-    await this.showNotification(`📅 Upcoming Event`, {
-      body: `${eventTitle} - Starting at ${startTime}`,
+    await this.showNotification(`📅 Event Reminder`, {
+      body: `${eventTitle} is starting at ${startTime}`,
       tag: 'event',
-      requireInteraction: false,
+      requireInteraction: true,
+      actions: [
+        {
+          action: 'view-event',
+          title: 'View Event',
+          icon: '/icon-192.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss',
+          icon: '/icon-192.png'
+        }
+      ],
       data: {
         type: 'event',
         title: eventTitle,
@@ -142,7 +168,19 @@ class NotificationService {
     await this.showNotification(`🔔 ${title}`, {
       body: message,
       tag: 'system',
-      requireInteraction: false,
+      requireInteraction: true,
+      actions: [
+        {
+          action: 'view',
+          title: 'View',
+          icon: '/icon-192.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss',
+          icon: '/icon-192.png'
+        }
+      ],
       data: {
         type: 'system',
         timestamp: Date.now()
