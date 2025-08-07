@@ -36,6 +36,7 @@ interface Message {
   sender_id: string;
   group_id: string;
   message_status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  read_by?: number;
   sender?: {
     first_name: string | null;
     last_name: string | null;
@@ -179,7 +180,21 @@ const SimpleMessageCenter = () => {
         throw messagesError;
       }
 
-      // Then fetch sender info for each message with better error handling
+      // Mark messages as read when fetching
+      for (const message of messagesData || []) {
+        if (message.sender_id !== user.id) {
+          try {
+            await supabase.rpc('mark_message_as_read', {
+              message_id_param: message.id,
+              user_id_param: user.id
+            });
+          } catch (error) {
+            console.warn('Error marking message as read:', error);
+          }
+        }
+      }
+
+      // Fetch sender info and read receipts for each message
       const messagesWithSender = await Promise.all(
         (messagesData || []).map(async (message) => {
           try {
@@ -187,20 +202,37 @@ const SimpleMessageCenter = () => {
               .from('profiles')
               .select('first_name, last_name, email')
               .eq('id', message.sender_id)
-              .maybeSingle(); // Use maybeSingle to handle missing profiles
+              .maybeSingle();
 
             if (senderError) {
               console.warn('Error fetching sender for message:', message.id, senderError);
             }
 
-            // Determine message status (simplified implementation)
-            const message_status = message.sender_id === user.id 
-              ? 'sent' as const 
-              : 'delivered' as const;
+            // Get read receipts for this message
+            const { data: readReceipts } = await supabase
+              .from('message_read_receipts')
+              .select('user_id, read_at')
+              .eq('message_id', message.id);
+
+            // Determine message status
+            let message_status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed' = 'sent';
+            
+            if (message.sender_id === user.id) {
+              // For sent messages, check if others have read it
+              if (readReceipts && readReceipts.length > 0) {
+                message_status = 'read';
+              } else {
+                message_status = 'delivered';
+              }
+            } else {
+              // For received messages, they're delivered
+              message_status = 'delivered';
+            }
 
             return {
               ...message,
               message_status,
+              read_by: readReceipts?.length || 0,
               sender: senderData || {
                 first_name: null,
                 last_name: null,
@@ -212,6 +244,7 @@ const SimpleMessageCenter = () => {
             return {
               ...message,
               message_status: 'sent' as const,
+              read_by: 0,
               sender: {
                 first_name: null,
                 last_name: null,
@@ -574,17 +607,20 @@ const SimpleMessageCenter = () => {
                                 {group.member_count} members
                               </span>
                             </div>
-                            {group.last_message && (
-                              <div className="mt-1">
-                                <p className="text-xs text-gray-600 truncate">
-                                  <span className="font-medium">{group.last_message.sender_name}:</span>{' '}
-                                  {group.last_message.content}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                  {new Date(group.last_message.created_at).toLocaleString()}
-                                </p>
-                              </div>
-                            )}
+                             {group.last_message && (
+                               <div className="mt-1">
+                                 <div className="flex items-center justify-between">
+                                   <p className="text-xs text-gray-600 truncate flex-1 mr-2">
+                                     <span className="font-medium">{group.last_message.sender_name}:</span>{' '}
+                                     {group.last_message.content}
+                                   </p>
+                                   {/* Show unread indicator - this would need unread count from backend */}
+                                 </div>
+                                 <p className="text-xs text-gray-400 mt-1">
+                                   {new Date(group.last_message.created_at).toLocaleString()}
+                                 </p>
+                               </div>
+                             )}
                           </div>
                         </div>
                       </div>
@@ -661,23 +697,30 @@ const SimpleMessageCenter = () => {
                                 </p>
                               )}
                                <p className="text-sm">{message.content}</p>
-                               <div className="flex items-center justify-between mt-1">
-                                 <p
-                                   className={`text-xs ${
-                                     message.sender_id === user?.id
-                                       ? 'text-blue-100'
-                                       : 'text-gray-500'
-                                   }`}
-                                 >
-                                   {new Date(message.created_at).toLocaleTimeString()}
-                                 </p>
-                                 {message.sender_id === user?.id && message.message_status && (
-                                   <MessageStatus 
-                                     status={message.message_status} 
-                                     className={message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}
-                                   />
-                                 )}
-                               </div>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p
+                                    className={`text-xs ${
+                                      message.sender_id === user?.id
+                                        ? 'text-blue-100'
+                                        : 'text-gray-500'
+                                    }`}
+                                  >
+                                    {new Date(message.created_at).toLocaleTimeString()}
+                                  </p>
+                                  <div className="flex items-center space-x-1">
+                                    {message.sender_id === user?.id && message.message_status && (
+                                      <MessageStatus 
+                                        status={message.message_status} 
+                                        className={message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}
+                                      />
+                                    )}
+                                    {message.sender_id === user?.id && message.read_by && message.read_by > 0 && (
+                                      <span className={`text-xs ${message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}`}>
+                                        Seen by {message.read_by}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                             </div>
                           </div>
                         ))}

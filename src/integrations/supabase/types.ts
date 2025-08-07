@@ -171,6 +171,38 @@ export type Database = {
         }
         Relationships: []
       }
+      message_read_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_message_read_receipts_message_id"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -320,6 +352,10 @@ export type Database = {
         Args: { user_id: string }
         Returns: Json
       }
+      get_unread_message_count: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
       is_group_admin: {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
@@ -327,6 +363,10 @@ export type Database = {
       is_group_member: {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
+      }
+      mark_message_as_read: {
+        Args: { message_id_param: string; user_id_param: string }
+        Returns: undefined
       }
     }
     Enums: {

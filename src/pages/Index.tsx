@@ -560,6 +560,17 @@ const Index = () => {
           </Tabs>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-muted/30 border-t border-border/40 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Built and Developed at MIS Office
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

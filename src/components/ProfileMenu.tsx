@@ -272,7 +272,9 @@ const ProfileMenu = () => {
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
       toast({
         title: "Signed Out",
         description: "You have been successfully signed out.",
