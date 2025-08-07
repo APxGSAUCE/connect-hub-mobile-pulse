@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, MessageSquare, Users, Bell, 
-  TrendingUp, Clock, CheckCircle, AlertCircle, Loader2, Menu
+  TrendingUp, Clock, CheckCircle, AlertCircle, Loader2, Menu, LogOut
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -287,22 +287,23 @@ const Index = () => {
                     {getInitials(user.email || 'User')}
                   </AvatarFallback>
                 </Avatar>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleSignOut} 
-                  className="hidden sm:inline-flex text-sm px-2"
-                >
-                  Sign Out
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleSignOut} 
-                  className="sm:hidden p-1.5"
-                >
-                  <Menu className="w-4 h-4" />
-                </Button>
+               <Button 
+                 variant="outline" 
+                 size="sm" 
+                 onClick={handleSignOut} 
+                 className="hidden sm:inline-flex text-sm px-3 py-1.5 text-muted-foreground hover:text-destructive hover:border-destructive/20 hover:bg-destructive/5 transition-colors"
+               >
+                 <LogOut className="w-4 h-4 mr-1.5" />
+                 Sign Out
+               </Button>
+               <Button 
+                 variant="outline" 
+                 size="sm" 
+                 onClick={handleSignOut} 
+                 className="sm:hidden p-2 text-muted-foreground hover:text-destructive hover:border-destructive/20 hover:bg-destructive/5 transition-colors"
+               >
+                 <LogOut className="w-4 h-4" />
+               </Button>
               </div>
             </div>
           </div>
