@@ -267,8 +267,12 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Users className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-xl flex items-center justify-center">
+              <img 
+                src="/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png" 
+                alt="Province of Ilocos Sur Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">One Ilocos Sur Portal</CardTitle>
