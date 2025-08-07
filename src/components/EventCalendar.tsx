@@ -191,7 +191,12 @@ const EventCalendar = () => {
 
         if (error) {
           console.error('Error creating event:', error);
-          throw error;
+          toast({
+            title: "Error",
+            description: `Failed to create event: ${error.message}`,
+            variant: "destructive"
+          });
+          return;
         }
 
         console.log('Event created successfully:', data);
@@ -210,7 +215,11 @@ const EventCalendar = () => {
 
           if (participantError) {
             console.error('Error adding participants:', participantError);
-            // Don't throw error here as the event was created successfully
+            toast({
+              title: "Warning", 
+              description: "Event created but failed to add some participants",
+              variant: "destructive"
+            });
           }
         }
 
@@ -220,7 +229,7 @@ const EventCalendar = () => {
         });
       }
 
-      fetchEvents();
+      // Don't manually refetch - let realtime updates handle it
       closeDialog();
 
     } catch (error) {

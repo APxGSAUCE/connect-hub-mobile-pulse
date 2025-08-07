@@ -75,22 +75,27 @@ class NotificationService {
     
     if (this.permissionGranted) {
       const baseOptions: NotificationOptions = {
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png',
+        badge: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png',
         dir: 'auto',
         lang: 'en',
         silent: false,
         body: options?.body,
         tag: options?.tag,
         requireInteraction: options?.requireInteraction || false,
-        data: options?.data
+        data: {
+          ...options?.data,
+          timestamp: Date.now(),
+          url: window.location.origin
+        }
       };
 
       try {
         if (this.registration && this.registration.active) {
-          // Use service worker notifications for advanced features
+          // Use service worker notifications for enhanced features including vibration
           const swOptions = {
             ...baseOptions,
+            vibrate: [200, 100, 200, 100, 200], // Add vibration for service worker notifications
             ...options // This allows actions, vibrate, etc. for service worker
           };
           await this.registration.showNotification(title, swOptions);
