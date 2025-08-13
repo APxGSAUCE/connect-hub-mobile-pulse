@@ -73,16 +73,6 @@ const Index = () => {
     }
   }, []);
 
-  // Initialize real-time notifications
-  useRealtimeNotifications({ 
-    onNotificationReceived: fetchDashboardData 
-  });
-
-  // Initialize notifications when component mounts
-  useEffect(() => {
-    notificationService.showPermissionPrompt();
-  }, []);
-
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
 
@@ -176,6 +166,16 @@ const Index = () => {
       fetchDashboardData();
     }
   }, [user, authLoading, fetchDashboardData]);
+
+  // Initialize real-time notifications
+  useRealtimeNotifications({ 
+    onNotificationReceived: fetchDashboardData 
+  });
+
+  // Initialize notifications when component mounts
+  useEffect(() => {
+    notificationService.showPermissionPrompt();
+  }, []);
 
   // Set up real-time subscriptions for dashboard updates
   useRealtimeSubscription('events', fetchDashboardData, [user]);
