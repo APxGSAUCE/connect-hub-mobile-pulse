@@ -81,33 +81,50 @@ class NotificationService {
         lang: 'en',
         silent: false,
         body: options?.body,
-        tag: options?.tag,
+        tag: options?.tag || 'default',
         requireInteraction: options?.requireInteraction || false,
         data: {
           ...options?.data,
           timestamp: Date.now(),
-          url: window.location.origin
+          url: window.location.origin,
+          clickUrl: options?.clickUrl || window.location.origin
         }
       };
 
       try {
         if (this.registration && this.registration.active) {
-          // Use service worker notifications for enhanced features including vibration
+          // Use service worker notifications for enhanced features
           const swOptions = {
             ...baseOptions,
-            vibrate: [200, 100, 200, 100, 200], // Add vibration for service worker notifications
-            ...options // This allows actions, vibrate, etc. for service worker
+            vibrate: options?.vibrate || [200, 100, 200],
+            actions: options?.actions || [],
+            image: options?.image,
+            renotify: true,
+            ...options
           };
           await this.registration.showNotification(title, swOptions);
         } else {
           // Fallback to regular notification if service worker isn't available
-          new Notification(title, baseOptions);
+          const notification = new Notification(title, baseOptions);
+          
+          // Add click handler for fallback notifications
+          notification.onclick = () => {
+            window.focus();
+            if (options?.clickUrl) {
+              window.location.href = options.clickUrl;
+            }
+            notification.close();
+          };
         }
       } catch (error) {
         console.error('Error showing notification:', error);
         // Fallback to regular notification
         try {
-          new Notification(title, baseOptions);
+          const notification = new Notification(title, baseOptions);
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
         } catch (fallbackError) {
           console.error('Fallback notification also failed:', fallbackError);
         }
@@ -118,25 +135,28 @@ class NotificationService {
   async showMessageNotification(senderName: string, message: string) {
     // Only show notification if app is not in focus
     if (document.hidden || !document.hasFocus()) {
-      await this.showNotification(`💬 ${senderName} sent you a message`, {
-        body: message,
+      await this.showNotification(`💬 ${senderName}`, {
+        body: message.length > 100 ? `${message.substring(0, 100)}...` : message,
         tag: 'message',
         requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
         actions: [
           {
             action: 'reply',
-            title: 'Reply',
-            icon: '/icon-192.png'
+            title: '💬 Reply',
+            icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
           },
           {
-            action: 'mark-read',
-            title: 'Mark as Read',
-            icon: '/icon-192.png'
+            action: 'view',
+            title: '👀 View',
+            icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
           }
         ],
+        clickUrl: '/?tab=messages',
         data: {
           type: 'message',
           sender: senderName,
+          messageContent: message,
           timestamp: Date.now()
         }
       });
@@ -144,22 +164,24 @@ class NotificationService {
   }
 
   async showEventNotification(eventTitle: string, startTime: string) {
-    await this.showNotification(`📅 Event Reminder`, {
-      body: `${eventTitle} is starting at ${startTime}`,
+    await this.showNotification(`📅 ${eventTitle}`, {
+      body: `Starting at ${startTime}`,
       tag: 'event',
       requireInteraction: true,
+      vibrate: [300, 100, 300],
       actions: [
         {
           action: 'view-event',
-          title: 'View Event',
-          icon: '/icon-192.png'
+          title: '📅 View Event',
+          icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
         },
         {
-          action: 'dismiss',
-          title: 'Dismiss',
-          icon: '/icon-192.png'
+          action: 'remind-later',
+          title: '⏰ Remind Later',
+          icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
         }
       ],
+      clickUrl: '/?tab=events',
       data: {
         type: 'event',
         title: eventTitle,
@@ -173,24 +195,60 @@ class NotificationService {
     await this.showNotification(`🔔 ${title}`, {
       body: message,
       tag: 'system',
-      requireInteraction: true,
+      requireInteraction: false,
+      vibrate: [100, 50, 100],
       actions: [
         {
           action: 'view',
-          title: 'View',
-          icon: '/icon-192.png'
+          title: '👀 View',
+          icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
         },
         {
           action: 'dismiss',
-          title: 'Dismiss',
-          icon: '/icon-192.png'
+          title: '✕ Dismiss',
+          icon: '/lovable-uploads/ee362ced-371f-4ebd-a238-94b33ae86a02.png'
         }
       ],
+      clickUrl: '/',
       data: {
         type: 'system',
+        title: title,
+        message: message,
         timestamp: Date.now()
       }
     });
+  }
+
+  // Method to show notification permission prompt with better UX
+  async showPermissionPrompt(): Promise<boolean> {
+    if (!this.isSupported()) {
+      console.warn('Notifications are not supported in this browser');
+      return false;
+    }
+
+    if (this.hasPermission()) {
+      return true;
+    }
+
+    if (Notification.permission === 'denied') {
+      console.warn('Notifications are blocked. User needs to enable them manually in browser settings.');
+      return false;
+    }
+
+    try {
+      const permission = await this.requestPermission();
+      if (permission) {
+        // Show a welcome notification
+        await this.showSystemNotification(
+          'Notifications Enabled!',
+          'You will now receive real-time updates from One Ilocos Sur Portal'
+        );
+      }
+      return permission;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
   }
 
   // Check if notifications are supported and permission is granted

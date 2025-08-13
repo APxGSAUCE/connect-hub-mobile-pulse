@@ -18,6 +18,8 @@ import ProfileMenu from "@/components/ProfileMenu";
 import EmployeeManagement from "@/components/EmployeeManagement";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 interface DashboardStats {
   total_messages: number;
@@ -71,10 +73,14 @@ const Index = () => {
     }
   }, []);
 
+  // Initialize real-time notifications
+  useRealtimeNotifications({ 
+    onNotificationReceived: fetchDashboardData 
+  });
+
   // Initialize notifications when component mounts
   useEffect(() => {
-    notificationService.initialize();
-    notificationService.requestPermission();
+    notificationService.showPermissionPrompt();
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
@@ -274,16 +280,10 @@ const Index = () => {
             </div>
             
             <div className="flex items-center space-x-1 sm:space-x-3 flex-shrink-0">
-              <div className="relative">
-                <Button variant="ghost" size="sm" className="relative p-1.5 sm:p-2">
-                  <Bell className="w-4 h-4" />
-                  {stats.unread_notifications > 0 && (
-                    <Badge className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 p-0 flex items-center justify-center text-xs">
-                      {stats.unread_notifications > 9 ? '9+' : stats.unread_notifications}
-                    </Badge>
-                  )}
-                </Button>
-              </div>
+              <NotificationCenter 
+                unreadCount={stats.unread_notifications} 
+                onCountChange={(count) => setStats(prev => ({ ...prev, unread_notifications: count }))}
+              />
               
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
