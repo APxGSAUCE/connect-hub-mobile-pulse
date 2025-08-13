@@ -348,6 +348,14 @@ export type Database = {
         Args: { other_user_id: string }
         Returns: string
       }
+      get_current_user_department: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_dashboard_stats: {
         Args: { user_id: string }
         Returns: Json
