@@ -169,31 +169,31 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
         </Button>
       </SheetTrigger>
       
-      <SheetContent className="w-full sm:w-96 flex flex-col">
-        <SheetHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notifications
+      <SheetContent className="w-full sm:w-96 max-w-full flex flex-col p-4 sm:p-6" side="right">
+        <SheetHeader className="pb-4 pr-8">
+          <div className="flex items-start justify-between gap-2">
+            <SheetTitle className="flex items-center gap-2 flex-wrap">
+              <Bell className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+              <span className="text-sm sm:text-base">Notifications</span>
               {unreadCount > 0 && (
-                <Badge variant="secondary">{unreadCount}</Badge>
+                <Badge variant="secondary" className="text-xs">{unreadCount}</Badge>
               )}
             </SheetTitle>
-            {unreadCount > 0 && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={markAllAsRead}
-                className="text-xs"
-              >
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Mark all read
-              </Button>
-            )}
           </div>
+          {unreadCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={markAllAsRead}
+              className="text-xs mt-2 w-fit"
+            >
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Mark all read
+            </Button>
+          )}
         </SheetHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -217,15 +217,15 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
                       : getNotificationBgColor(notification.type)
                   }`}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       <div className="flex-shrink-0 mt-0.5">
                         {getNotificationIcon(notification.type)}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className={`text-sm font-medium leading-5 ${
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-start justify-between gap-1 sm:gap-2">
+                          <h4 className={`text-xs sm:text-sm font-medium leading-4 sm:leading-5 break-words ${
                             notification.is_read ? 'text-muted-foreground' : 'text-foreground'
                           }`}>
                             {notification.title}
@@ -235,14 +235,14 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
                               variant="ghost"
                               size="sm"
                               onClick={() => markAsRead(notification.id)}
-                              className="p-1 h-auto hover:bg-background/50"
+                              className="p-1 h-6 w-6 hover:bg-background/50 flex-shrink-0 touch-manipulation"
                             >
                               <Check className="w-3 h-3" />
                             </Button>
                           )}
                         </div>
                         
-                        <p className={`text-xs mt-1 leading-4 ${
+                        <p className={`text-xs mt-1 leading-4 break-words ${
                           notification.is_read ? 'text-muted-foreground' : 'text-foreground/80'
                         }`}>
                           {notification.message}
