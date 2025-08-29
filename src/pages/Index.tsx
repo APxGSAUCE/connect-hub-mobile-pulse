@@ -276,7 +276,7 @@ const Index = () => {
                   className="w-full h-full object-contain rounded-lg"
                 />
               </div>
-              <h1 className="text-sm sm:text-lg font-bold text-gray-900 truncate">One Ilocos Sur Portal</h1>
+              <h1 className="text-sm sm:text-lg font-bold text-gray-900 truncate">PGIS EMPLOYEE PORTAL</h1>
             </div>
             
             <div className="flex items-center space-x-1 sm:space-x-3 flex-shrink-0">
