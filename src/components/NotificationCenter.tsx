@@ -171,7 +171,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
       </SheetTrigger>
       
       <SheetContent 
-            className="w-full sm:w-96 max-w-full flex flex-col p-3 sm:p-6"
+            className="w-80 max-w-[90vw] flex flex-col p-3 sm:p-6"
             side="right"
             showClose={false}
             onTouchStart={(e) => {
