@@ -78,6 +78,25 @@
   }
 }
 
+/* App-wide header consistency */
+@layer components {
+  .app-header-alignment {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .header-title-align {
+    @apply flex justify-between items-center h-12 sm:h-14;
+  }
+
+  .header-logo-title {
+    @apply flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1;
+  }
+
+  .header-actions {
+    @apply flex items-center space-x-1 sm:space-x-3 flex-shrink-0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
