@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Bell, X, Check, MessageSquare, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Bell, ArrowLeft, Check, MessageSquare, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +34,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -169,14 +170,41 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
         </Button>
       </SheetTrigger>
       
-      <SheetContent className="w-full sm:w-96 max-w-full flex flex-col p-3 sm:p-6" side="right">
-        <SheetHeader className="pb-3 sm:pb-4 pr-12 sm:pr-14">
-          <div className="flex items-start justify-between gap-2">
-            <SheetTitle className="flex items-center gap-1 sm:gap-2 flex-wrap pr-2">
+      <SheetContent 
+            className="w-full sm:w-96 max-w-full flex flex-col p-3 sm:p-6"
+            side="right"
+            showClose={false}
+            onTouchStart={(e) => {
+              const t = e.touches[0];
+              touchStart.current = { x: t.clientX, y: t.clientY };
+            }}
+            onTouchEnd={(e) => {
+              const t = e.changedTouches[0];
+              if (!touchStart.current) return;
+              const dx = t.clientX - touchStart.current.x;
+              const dy = t.clientY - touchStart.current.y;
+              if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+                setIsOpen(false);
+              }
+              touchStart.current = null;
+            }}
+          >
+        <SheetHeader className="pb-3 sm:pb-4 pr-4 sm:pr-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(false)}
+              className="h-8 w-8 sm:h-9 sm:w-9 -ml-1"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <SheetTitle className="flex items-center gap-1 sm:gap-2 flex-wrap">
               <Bell className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
               <span className="text-sm sm:text-base leading-tight">Notifications</span>
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="text-xs shrink-0">{unreadCount}</Badge>
+                <Badge variant="secondary" className="text-xs">{unreadCount}</Badge>
               )}
             </SheetTitle>
           </div>
