@@ -170,13 +170,13 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
       </SheetTrigger>
       
       <SheetContent className="w-full sm:w-96 max-w-full flex flex-col p-3 sm:p-6" side="right">
-        <SheetHeader className="pb-3 sm:pb-4 pr-6 sm:pr-8">
-          <div className="flex items-start justify-between gap-1 sm:gap-2">
-            <SheetTitle className="flex items-center gap-1 sm:gap-2 flex-wrap">
+        <SheetHeader className="pb-3 sm:pb-4 pr-12 sm:pr-14">
+          <div className="flex items-start justify-between gap-2">
+            <SheetTitle className="flex items-center gap-1 sm:gap-2 flex-wrap pr-2">
               <Bell className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-              <span className="text-sm sm:text-base">Notifications</span>
+              <span className="text-sm sm:text-base leading-tight">Notifications</span>
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="text-xs">{unreadCount}</Badge>
+                <Badge variant="secondary" className="text-xs shrink-0">{unreadCount}</Badge>
               )}
             </SheetTitle>
           </div>
