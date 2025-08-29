@@ -80,58 +80,32 @@ const Index = () => {
     try {
       setLoading(true);
 
-      const [messagesResult, employeesResult, eventsResult, notificationsResult, recentEventsResult] = await Promise.all([
-        supabase
-          .from('chat_group_members')
-          .select('group_id')
-          .eq('user_id', user.id)
-          .then(async ({ data: groupData }) => {
-            if (!groupData || groupData.length === 0) return { data: [] };
-            const groupIds = groupData.map(g => g.group_id);
-            return supabase
-              .from('messages')
-              .select('id, sender_id, created_at')
-              .in('group_id', groupIds);
-          }),
-        
-        supabase
-          .from('profiles')
-          .select('id')
-          .eq('status', 'active'),
-        
-        supabase
-          .from('events')
-          .select('id')
-          .gte('start_date', new Date().toISOString()),
-        
-        supabase
-          .from('notifications')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('is_read', false),
-
-        supabase
-          .from('events')
-          .select('id, title, start_date, event_type, location')
-          .gte('start_date', new Date().toISOString())
-          .order('start_date', { ascending: true })
-          .limit(3)
-      ]);
-
-      const totalMessages = (await messagesResult).data?.length || 0;
-      const unreadMessages = (await messagesResult).data?.filter(
-        msg => msg.sender_id !== user.id
-      ).length || 0;
-
-      setStats({
-        total_messages: totalMessages,
-        unread_messages: unreadMessages,
-        upcoming_events: eventsResult.data?.length || 0,
-        total_employees: employeesResult.data?.length || 0,
-        unread_notifications: notificationsResult.data?.length || 0
+      // Use the updated dashboard stats function
+      const { data: dashboardStats, error: statsError } = await supabase.rpc('get_dashboard_stats', {
+        user_id: user.id
       });
 
-      setRecentEvents(recentEventsResult.data || []);
+      if (statsError) {
+        console.error('Error fetching dashboard stats:', statsError);
+        throw statsError;
+      }
+
+      const { data: recentEventsResult } = await supabase
+        .from('events')
+        .select('id, title, start_date, event_type, location')
+        .gte('start_date', new Date().toISOString())
+        .order('start_date', { ascending: true })
+        .limit(3);
+
+      setStats({
+        total_messages: (dashboardStats as any)?.total_conversations || 0,
+        unread_messages: (dashboardStats as any)?.unread_conversations || 0,
+        upcoming_events: (dashboardStats as any)?.upcoming_events || 0,
+        total_employees: (dashboardStats as any)?.total_employees || 0,
+        unread_notifications: (dashboardStats as any)?.unread_notifications || 0
+      });
+
+      setRecentEvents(recentEventsResult || []);
 
       const { data: notifications } = await supabase
         .from('notifications')
@@ -330,7 +304,7 @@ const Index = () => {
                     <CardContent className="p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-gray-600">Messages</p>
+                          <p className="text-xs font-medium text-gray-600">Conversations</p>
                           <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total_messages}</p>
                         </div>
                         <div className="w-6 h-6 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center ml-2 flex-shrink-0">

@@ -124,7 +124,7 @@ const SimpleMessageCenter = () => {
               .eq('group_id', group.id)
               .neq('user_id', user.id)
               .limit(1)
-              .single();
+              .maybeSingle();
 
             if (otherMember?.profiles) {
               const profile = otherMember.profiles as any;
@@ -139,7 +139,7 @@ const SimpleMessageCenter = () => {
             .eq('group_id', group.id)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           let senderName = 'Unknown';
           if (lastMessageData) {
@@ -147,7 +147,7 @@ const SimpleMessageCenter = () => {
               .from('profiles')
               .select('first_name, last_name, email')
               .eq('id', lastMessageData.sender_id)
-              .single();
+              .maybeSingle();
 
             if (senderData) {
               senderName = `${senderData.first_name || ''} ${senderData.last_name || ''}`.trim() || senderData.email || 'Unknown';
@@ -236,18 +236,29 @@ const SimpleMessageCenter = () => {
               .select('user_id, read_at')
               .eq('message_id', message.id);
 
-            // Determine message status
+            // Get total group members count for better status determination
+            const { count: totalMembers } = await supabase
+              .from('chat_group_members')
+              .select('*', { count: 'exact', head: true })
+              .eq('group_id', message.group_id);
+
+            // Determine message status more accurately
             let message_status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed' = 'sent';
             
             if (message.sender_id === user.id) {
-              // For sent messages, check if others have read it
-              if (readReceipts && readReceipts.length > 0) {
+              // For sent messages, check read status more accurately
+              const readCount = readReceipts?.length || 0;
+              const otherMembersCount = (totalMembers || 1) - 1; // Exclude sender
+              
+              if (readCount > 0 && readCount >= otherMembersCount) {
                 message_status = 'read';
+              } else if (readCount > 0) {
+                message_status = 'delivered'; // Partially read
               } else {
-                message_status = 'delivered';
+                message_status = 'delivered'; // Sent but not read yet
               }
             } else {
-              // For received messages, they're delivered
+              // For received messages, mark as delivered
               message_status = 'delivered';
             }
 
@@ -440,9 +451,12 @@ const SimpleMessageCenter = () => {
     fetchMessages(group.id);
   };
 
-  const filteredGroups = groups.filter(group =>
-    group.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGroups = groups.filter(group => {
+    const displayName = group.group_type === 'direct' && group.other_user_name 
+      ? group.other_user_name 
+      : group.name;
+    return displayName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -614,17 +628,21 @@ const SimpleMessageCenter = () => {
                       >
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-10 h-10 flex-shrink-0">
-                            <AvatarFallback className="bg-blue-100 text-blue-600">
-                              {group.group_type === 'direct' ? (
-                                <MessageSquare className="w-5 h-5" />
-                              ) : (
-                                getInitials(group.name)
-                              )}
-                            </AvatarFallback>
+                             <AvatarFallback className="bg-blue-100 text-blue-600">
+                               {group.group_type === 'direct' ? (
+                                 group.other_user_name ? getInitials(group.other_user_name) : <MessageSquare className="w-5 h-5" />
+                               ) : (
+                                 getInitials(group.name)
+                               )}
+                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-sm truncate">{group.name}</h4>
+                               <h4 className="font-medium text-sm truncate">
+                                 {group.group_type === 'direct' && group.other_user_name 
+                                   ? group.other_user_name 
+                                   : group.name}
+                               </h4>
                               <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
                                 {group.member_count} members
                               </span>
@@ -683,7 +701,11 @@ const SimpleMessageCenter = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <CardTitle className="text-lg">{selectedGroup.name}</CardTitle>
+                       <CardTitle className="text-lg">
+                         {selectedGroup.group_type === 'direct' && selectedGroup.other_user_name 
+                           ? selectedGroup.other_user_name 
+                           : selectedGroup.name}
+                       </CardTitle>
                       {selectedGroup.description && (
                         <CardDescription>{selectedGroup.description}</CardDescription>
                       )}
