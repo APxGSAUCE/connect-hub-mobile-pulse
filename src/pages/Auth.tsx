@@ -275,7 +275,7 @@ const Auth = () => {
               />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">One Ilocos Sur Portal</CardTitle>
+          <CardTitle className="text-2xl font-bold">PGIS EMPLOYEE PORTAL</CardTitle>
           <CardDescription>
             {isLogin ? "Welcome back! Please sign in to your account." : "Create your account to get started."}
           </CardDescription>
