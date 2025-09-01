@@ -367,6 +367,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_user_create_content: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_direct_message_group: {
         Args: { other_user_id: string }
         Returns: string
