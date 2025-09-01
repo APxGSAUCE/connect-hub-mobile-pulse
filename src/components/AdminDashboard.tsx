@@ -205,7 +205,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  if (userRole !== 'SUPER_ADMIN' && userRole !== 'admin') {
+  if (userRole !== 'super_admin' && userRole !== 'admin') {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -234,7 +234,7 @@ export const AdminDashboard = () => {
         </div>
         <Badge variant="outline" className="bg-blue-50 text-blue-700">
           <Shield className="w-4 h-4 mr-1" />
-          {userRole === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+          {userRole === 'super_admin' ? 'Super Admin' : 'Admin'}
         </Badge>
       </div>
 
@@ -391,7 +391,7 @@ export const AdminDashboard = () => {
                     <Badge className={getStatusColor(user.status)}>
                       {user.status}
                     </Badge>
-                    {userRole === 'SUPER_ADMIN' && (
+                    {userRole === 'super_admin' && (
                       <select
                         value={user.role}
                         onChange={(e) => updateUserRole(user.id, e.target.value)}
