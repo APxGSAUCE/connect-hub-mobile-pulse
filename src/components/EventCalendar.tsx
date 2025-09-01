@@ -8,12 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2, UserPlus } from "lucide-react";
+import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2, UserPlus, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useUserRole } from "@/hooks/useUserRole";
+import { PermissionBanner } from "@/components/PermissionBanner";
 
 interface Event {
   id: string;
@@ -37,6 +39,7 @@ interface Profile {
 const EventCalendar = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { userRole, loading: roleLoading } = useUserRole();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -109,6 +112,16 @@ const EventCalendar = () => {
 
   const handleCreateOrUpdateEvent = async () => {
     if (!user) return;
+
+    // Check permissions for creating new events
+    if (!editingEvent && !userRole?.can_create_events) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to create events.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     if (!newEvent.title || !newEvent.start_date || !newEvent.end_date) {
       toast({
@@ -364,7 +377,7 @@ const EventCalendar = () => {
       : employee.email || 'Unknown User';
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -374,6 +387,11 @@ const EventCalendar = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-20 md:pb-6 px-1 sm:px-0">
+      {/* Permission Banner */}
+      {userRole && (
+        <PermissionBanner userRole={userRole} feature="events" />
+      )}
+
       {/* Header - Mobile optimized */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
         <div>
@@ -383,9 +401,22 @@ const EventCalendar = () => {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
+            <Button 
+              className="w-full sm:w-auto" 
+              onClick={() => setIsDialogOpen(true)}
+              disabled={!userRole?.can_create_events}
+            >
+              {userRole?.can_create_events ? (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Event
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Cannot Create Events
+                </>
+              )}
             </Button>
           </DialogTrigger>
           <DialogContent className="w-[95vw] max-w-[500px] max-h-[85vh] overflow-y-auto mx-auto p-4 sm:p-6">

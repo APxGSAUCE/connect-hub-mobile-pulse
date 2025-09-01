@@ -10,6 +10,8 @@ import { User, Settings, LogOut, Edit, Save, X, Loader2, Camera } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { PermissionMatrix } from "@/components/PermissionBanner";
 
 interface Department {
   id: string;
@@ -20,6 +22,7 @@ interface Department {
 const ProfileMenu = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { userRole } = useUserRole();
   const [profileData, setProfileData] = useState({
     first_name: '',
     last_name: '',
@@ -239,23 +242,29 @@ const ProfileMenu = () => {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <User className="w-5 h-5" />
-            <span>Profile Settings</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleEditToggle}
-            disabled={loading}
-          >
-            {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
-          </Button>
-        </CardTitle>
-      </CardHeader>
+    <div className="space-y-6 pb-20 md:pb-6 px-1 sm:px-0">
+      {/* Permission Matrix */}
+      {userRole && (
+        <PermissionMatrix userRole={userRole} />
+      )}
+
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <User className="w-5 h-5" />
+              <span>Profile Settings</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleEditToggle}
+              disabled={loading}
+            >
+              {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+            </Button>
+          </CardTitle>
+        </CardHeader>
       
       <CardContent className="space-y-6">
         {/* Profile Header */}
@@ -455,6 +464,7 @@ const ProfileMenu = () => {
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 };
 

@@ -7,13 +7,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Plus, Send, Users, Loader2, Search } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, Loader2, Search, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
 import { MessageStatus } from "@/components/MessageStatus";
+import { useUserRole } from "@/hooks/useUserRole";
+import { PermissionBanner } from "@/components/PermissionBanner";
 
 interface ChatGroup {
   id: string;
@@ -57,6 +59,7 @@ interface Employee {
 const SimpleMessageCenter = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { userRole, loading: roleLoading } = useUserRole();
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -372,6 +375,16 @@ const SimpleMessageCenter = () => {
   const handleCreateGroup = async () => {
     if (!user || !newGroupName.trim()) return;
 
+    // Check permissions
+    if (!userRole?.can_create_messages) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to create group chats.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const { data: groupData, error: groupError } = await supabase
         .from('chat_groups')
@@ -419,6 +432,16 @@ const SimpleMessageCenter = () => {
 
   const handleCreateDirectMessage = async () => {
     if (!user || !selectedEmployee) return;
+
+    // Check permissions
+    if (!userRole?.can_create_messages) {
+      toast({
+        title: "Access Denied", 
+        description: "You don't have permission to create direct messages.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       const { data, error } = await supabase.rpc('create_direct_message_group', {
@@ -470,7 +493,7 @@ const SimpleMessageCenter = () => {
     return 'Unknown';
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -480,6 +503,11 @@ const SimpleMessageCenter = () => {
 
   return (
     <div className="h-full flex flex-col space-y-4 pb-20 md:pb-6">
+      {/* Permission Banner */}
+      {userRole && (
+        <PermissionBanner userRole={userRole} feature="messages" />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
@@ -489,9 +517,21 @@ const SimpleMessageCenter = () => {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              New Chat
+            <Button 
+              className="w-full sm:w-auto" 
+              disabled={!userRole?.can_create_messages}
+            >
+              {userRole?.can_create_messages ? (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Chat
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Cannot Create Chats
+                </>
+              )}
             </Button>
           </DialogTrigger>
           <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
