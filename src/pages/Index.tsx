@@ -85,7 +85,7 @@ const Index = () => {
 
       // Use the updated dashboard stats function
       const { data: dashboardStats, error: statsError } = await supabase.rpc('get_dashboard_stats', {
-        user_id: user.id
+        user_id_param: user.id
       });
 
       if (statsError) {
