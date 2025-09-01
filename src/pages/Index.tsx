@@ -289,7 +289,7 @@ const Index = () => {
               >
                 <Users className="w-4 h-4" />
                 <span className="hidden xs:inline">Team</span>
-                <span className="xs:hidden">People</span>
+                <span className="xs:hidden">Employee</span>
               </TabsTrigger>
               {(userRole === 'super_admin' || userRole === 'admin') && (
                 <TabsTrigger 
