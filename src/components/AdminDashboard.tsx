@@ -188,9 +188,9 @@ export const AdminDashboard = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'SUPER_ADMIN': return 'bg-red-100 text-red-800';
-      case 'ADMIN': return 'bg-blue-100 text-blue-800';
-      case 'DEPT_HEAD': return 'bg-purple-100 text-purple-800';
+      case 'super_admin': return 'bg-red-100 text-red-800';
+      case 'admin': return 'bg-blue-100 text-blue-800';
+      case 'dept_head': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -397,10 +397,10 @@ export const AdminDashboard = () => {
                         onChange={(e) => updateUserRole(user.id, e.target.value)}
                         className="text-sm border rounded px-2 py-1"
                       >
-                        <option value="EMPLOYEE">Employee</option>
-                        <option value="DEPT_HEAD">Department Head</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="SUPER_ADMIN">Super Admin</option>
+                         <option value="employee">Employee</option>
+                         <option value="dept_head">Department Head</option>
+                         <option value="admin">Admin</option>
+                         <option value="super_admin">Super Admin</option>
                       </select>
                     )}
                   </div>
