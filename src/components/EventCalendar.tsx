@@ -34,7 +34,11 @@ interface Profile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
+  email?: string | null; // Made optional since non-admins don't see emails
+  position?: string | null; // From the new function
+  avatar_url?: string | null; // From the new function
+  status?: string | null; // From the new function
+  department_id?: string | null; // From the new function
 }
 
 const EventCalendar = () => {
@@ -91,24 +95,33 @@ const EventCalendar = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('status', 'active');
-
-      if (error) throw error;
-      setEmployees(data || []);
+      // Check if user is admin/super_admin to get full details
+      if (userRole?.can_manage_users) {
+        // Use admin function to get full employee details including emails
+        const { data, error } = await supabase
+          .rpc('get_employee_details_admin');
+        
+        if (error) throw error;
+        setEmployees(data || []);
+      } else {
+        // For non-admins, use the secure function (limited info)
+        const { data, error } = await supabase
+          .rpc('get_department_colleagues');
+        
+        if (error) throw error;
+        setEmployees(data || []);
+      }
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && userRole !== null) { // Wait for userRole to be loaded
       fetchEvents();
       fetchEmployees();
     }
-  }, [user]);
+  }, [user, userRole]);
 
   // Set up real-time subscription for events
   useRealtimeSubscription('events', fetchEvents, [user]);
@@ -408,7 +421,7 @@ const EventCalendar = () => {
   const getEmployeeName = (employee: Profile) => {
     return employee.first_name && employee.last_name 
       ? `${employee.first_name} ${employee.last_name}`
-      : employee.email || 'Unknown User';
+      : 'Unknown User';
   };
 
   if (loading || roleLoading) {

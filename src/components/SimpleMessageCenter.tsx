@@ -43,7 +43,7 @@ interface Message {
   sender?: {
     first_name: string | null;
     last_name: string | null;
-    email: string | null;
+    email?: string | null; // Made optional since we're not exposing emails anymore
   };
 }
 
@@ -51,9 +51,11 @@ interface Employee {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
+  email?: string | null; // Made optional for security
   department_id: string | null;
   position: string | null;
+  avatar_url?: string | null; // Added from the new function
+  status?: string | null; // Added from the new function
 }
 
 const SimpleMessageCenter = () => {
@@ -148,12 +150,12 @@ const SimpleMessageCenter = () => {
           if (lastMessageData) {
             const { data: senderData } = await supabase
               .from('profiles')
-              .select('first_name, last_name, email')
+              .select('first_name, last_name')
               .eq('id', lastMessageData.sender_id)
               .maybeSingle();
 
             if (senderData) {
-              senderName = `${senderData.first_name || ''} ${senderData.last_name || ''}`.trim() || senderData.email || 'Unknown';
+              senderName = `${senderData.first_name || ''} ${senderData.last_name || ''}`.trim() || 'Unknown';
             }
           }
 
@@ -225,7 +227,7 @@ const SimpleMessageCenter = () => {
           try {
             const { data: senderData, error: senderError } = await supabase
               .from('profiles')
-              .select('first_name, last_name, email')
+              .select('first_name, last_name')
               .eq('id', message.sender_id)
               .maybeSingle();
 
@@ -269,11 +271,10 @@ const SimpleMessageCenter = () => {
               ...message,
               message_status,
               read_by: readReceipts?.length || 0,
-              sender: senderData || {
-                first_name: null,
-                last_name: null,
-                email: 'Unknown User'
-              }
+               sender: senderData || {
+                 first_name: null,
+                 last_name: null
+               }
             };
           } catch (error) {
             console.warn('Error processing message:', message.id, error);
@@ -281,11 +282,10 @@ const SimpleMessageCenter = () => {
               ...message,
               message_status: 'sent' as const,
               read_by: 0,
-              sender: {
-                first_name: null,
-                last_name: null,
-                email: 'Unknown User'
-              }
+               sender: {
+                 first_name: null,
+                 last_name: null
+               }
             };
           }
         })
@@ -309,14 +309,15 @@ const SimpleMessageCenter = () => {
     if (!user) return;
 
     try {
+      // Use the new secure function to get department colleagues (no email exposure)
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, department_id, position')
-        .eq('status', 'active')
-        .neq('id', user.id);
+        .rpc('get_department_colleagues');
 
       if (error) throw error;
-      setEmployees(data || []);
+
+      // Filter out current user and only show colleagues
+      const colleagues = data?.filter(colleague => colleague.id !== user.id) || [];
+      setEmployees(colleagues);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
@@ -486,11 +487,11 @@ const SimpleMessageCenter = () => {
   };
 
   const getSenderName = (message: Message) => {
-    if (message.sender) {
-      const fullName = `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim();
-      return fullName || message.sender.email || 'Unknown';
-    }
-    return 'Unknown';
+   if (message.sender) {
+     const fullName = `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim();
+     return fullName || 'Unknown';
+   }
+   return 'Unknown';
   };
 
   if (loading || roleLoading) {
@@ -612,9 +613,9 @@ const SimpleMessageCenter = () => {
                   >
                     <option value="">Choose an employee...</option>
                     {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {`${employee.first_name || ''} ${employee.last_name || ''}`.trim() || employee.email}
-                        {employee.position && ` - ${employee.position}`}
+                       <option key={employee.id} value={employee.id}>
+                         {`${employee.first_name || ''} ${employee.last_name || ''}`.trim() || 'Unknown'}
+                         {employee.position && ` - ${employee.position}`}
                       </option>
                     ))}
                   </select>

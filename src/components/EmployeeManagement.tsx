@@ -40,20 +40,19 @@ const EmployeeManagement = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .order('first_name');
-
-      if (selectedDepartment !== 'all') {
-        query = query.eq('department_id', selectedDepartment);
-      }
-
-      const { data, error } = await query;
+      // Use the secure admin function to get full employee details
+      const { data, error } = await supabase
+        .rpc('get_employee_details_admin');
 
       if (error) throw error;
       
-      const typedEmployees = (data || []).map(emp => ({
+      // Apply department filter if needed
+      let filteredData = data || [];
+      if (selectedDepartment !== 'all') {
+        filteredData = filteredData.filter(emp => emp.department_id === selectedDepartment);
+      }
+      
+      const typedEmployees = filteredData.map(emp => ({
         ...emp,
         status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive'
       }));

@@ -394,6 +394,36 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: Json
       }
+      get_department_colleagues: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          department_id: string
+          first_name: string
+          id: string
+          last_name: string
+          position: string
+          status: string
+        }[]
+      }
+      get_employee_details_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          created_at: string
+          department_id: string
+          email: string
+          employee_id: string
+          first_name: string
+          id: string
+          last_name: string
+          phone: string
+          position: string
+          role: string
+          status: string
+          updated_at: string
+        }[]
+      }
       get_unread_message_count: {
         Args: { user_id_param: string }
         Returns: number
