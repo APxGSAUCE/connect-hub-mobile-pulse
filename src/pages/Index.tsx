@@ -21,6 +21,7 @@ import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { AdminVerificationCenter } from "@/components/AdminVerificationCenter";
 
 interface DashboardStats {
   total_messages: number;
@@ -69,7 +70,7 @@ const Index = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['dashboard', 'messages', 'events', 'employees', 'profile'].includes(tab)) {
+    if (tab && ['dashboard', 'messages', 'events', 'employees', 'admin'].includes(tab)) {
       setActiveTab(tab);
     }
   }, []);
@@ -186,7 +187,7 @@ const Index = () => {
       'messages': 'messages',
       'events': 'events',
       'employees': 'employees',
-      'profile': 'profile'
+      'admin': 'admin'
     };
     
     if (tabMap[shortcut]) {
@@ -271,7 +272,7 @@ const Index = () => {
                 <span className="xs:hidden">People</span>
               </TabsTrigger>
               <TabsTrigger 
-                value="profile" 
+                value="admin" 
                 className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
                 <Avatar className="w-4 h-4">
@@ -279,7 +280,7 @@ const Index = () => {
                     {getInitials(user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
-                <span>Profile</span>
+                <span>Admin</span>
               </TabsTrigger>
             </TabsList>
 
@@ -471,8 +472,8 @@ const Index = () => {
                 <EmployeeManagement />
               </TabsContent>
 
-              <TabsContent value="profile" className="h-full overflow-y-auto safe-area-bottom">
-                <ProfileMenu />
+              <TabsContent value="admin" className="h-full overflow-y-auto">
+                <AdminVerificationCenter />
               </TabsContent>
             </div>
           </Tabs>

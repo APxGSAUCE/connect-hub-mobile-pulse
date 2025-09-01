@@ -80,6 +80,7 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          head_user_id: string | null
           id: string
           name: string
           updated_at: string | null
@@ -87,6 +88,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description?: string | null
+          head_user_id?: string | null
           id?: string
           name: string
           updated_at?: string | null
@@ -94,11 +96,20 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string | null
+          head_user_id?: string | null
           id?: string
           name?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "departments_head_user_id_fkey"
+            columns: ["head_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_participants: {
         Row: {
@@ -288,10 +299,13 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           avatar_url: string | null
           created_at: string | null
           department_id: string | null
           email: string | null
+          employee_id: string | null
           first_name: string | null
           id: string
           last_name: string | null
@@ -300,12 +314,16 @@ export type Database = {
           role: string | null
           status: string | null
           updated_at: string | null
+          verification_documents: Json | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
           department_id?: string | null
           email?: string | null
+          employee_id?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
@@ -314,12 +332,16 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          verification_documents?: Json | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
           department_id?: string | null
           email?: string | null
+          employee_id?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
@@ -328,6 +350,7 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          verification_documents?: Json | null
         }
         Relationships: [
           {
