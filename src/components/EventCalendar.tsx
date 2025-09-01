@@ -56,6 +56,7 @@ const EventCalendar = () => {
   });
   const [employees, setEmployees] = useState<Profile[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const fetchEvents = async () => {
     if (!user) return;
@@ -146,6 +147,30 @@ const EventCalendar = () => {
     try {
       setLoading(true);
 
+      let imageUrl = newEvent.image_url;
+
+      // Upload image file if provided
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `events/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('files')
+          .upload(filePath, imageFile);
+
+        if (uploadError) {
+          console.error('Image upload error:', uploadError);
+          throw new Error('Failed to upload image');
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('files')
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrl;
+      }
+
       const eventData = {
         title: newEvent.title,
         description: newEvent.description || null,
@@ -154,7 +179,7 @@ const EventCalendar = () => {
         location: newEvent.location || null,
         event_type: newEvent.event_type,
         created_by: user.id,
-        image_url: newEvent.image_url || null
+        image_url: imageUrl || null
       };
 
       if (editingEvent) {
@@ -344,6 +369,7 @@ const EventCalendar = () => {
     });
     setSelectedParticipants([]);
     setEditingEvent(null);
+    setImageFile(null);
   };
 
   const getEventStatus = (startDate: string, endDate: string) => {
@@ -364,6 +390,9 @@ const EventCalendar = () => {
       case 'conference': return 'bg-green-100 text-green-800';
       case 'social': return 'bg-yellow-100 text-yellow-800';
       case 'training': return 'bg-indigo-100 text-indigo-800';
+      case 'fun_run': return 'bg-orange-100 text-orange-800';
+      case 'program': return 'bg-teal-100 text-teal-800';
+      case 'holiday': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -505,21 +534,76 @@ const EventCalendar = () => {
                     <SelectItem value="conference">Conference</SelectItem>
                     <SelectItem value="social">Social</SelectItem>
                     <SelectItem value="training">Training</SelectItem>
+                    <SelectItem value="fun_run">Fun Run</SelectItem>
+                    <SelectItem value="program">Program</SelectItem>
+                    <SelectItem value="holiday">Holiday</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="image_url" className="text-xs sm:text-sm font-medium">Event Image URL</Label>
-                <Input
-                  id="image_url"
-                  placeholder="Enter image URL (optional)"
-                  value={newEvent.image_url}
-                  onChange={(e) => setNewEvent({ ...newEvent, image_url: e.target.value })}
-                  className="text-sm h-9"
-                  type="url"
-                />
+              <div className="grid gap-2">
+                <Label className="text-xs sm:text-sm font-medium">Event Image</Label>
+                
+                <div className="grid gap-1.5">
+                  <Label htmlFor="image_file" className="text-xs font-medium text-gray-600">Upload Image</Label>
+                  <Input
+                    id="image_file"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImageFile(file);
+                        setNewEvent({ ...newEvent, image_url: '' }); // Clear URL when file is selected
+                      }
+                    }}
+                    className="text-xs sm:text-sm h-9"
+                  />
+                </div>
+
+                <div className="text-xs text-gray-400 text-center">OR</div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="image_url" className="text-xs font-medium text-gray-600">Image URL</Label>
+                  <Input
+                    id="image_url"
+                    placeholder="Enter image URL (optional)"
+                    value={newEvent.image_url}
+                    onChange={(e) => {
+                      setNewEvent({ ...newEvent, image_url: e.target.value });
+                      if (e.target.value) {
+                        setImageFile(null); // Clear file when URL is entered
+                      }
+                    }}
+                    className="text-sm h-9"
+                    type="url"
+                  />
+                </div>
+
+                {(imageFile || newEvent.image_url) && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                    {imageFile ? (
+                      <img 
+                        src={URL.createObjectURL(imageFile)} 
+                        alt="Event preview" 
+                        className="w-full h-24 object-cover rounded-md border"
+                      />
+                    ) : newEvent.image_url ? (
+                      <img 
+                        src={newEvent.image_url} 
+                        alt="Event preview" 
+                        className="w-full h-24 object-cover rounded-md border"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                )}
+                
                 <p className="text-xs text-gray-500">Add a visual to make your event more engaging</p>
               </div>
 
