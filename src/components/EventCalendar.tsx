@@ -27,6 +27,7 @@ interface Event {
   event_type: string;
   created_by: string;
   created_at: string;
+  image_url: string | null;
 }
 
 interface Profile {
@@ -50,7 +51,8 @@ const EventCalendar = () => {
     start_date: '',
     end_date: '',
     location: '',
-    event_type: 'meeting'
+    event_type: 'meeting',
+    image_url: ''
   });
   const [employees, setEmployees] = useState<Profile[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
@@ -151,7 +153,8 @@ const EventCalendar = () => {
         end_date: newEvent.end_date,
         location: newEvent.location || null,
         event_type: newEvent.event_type,
-        created_by: user.id
+        created_by: user.id,
+        image_url: newEvent.image_url || null
       };
 
       if (editingEvent) {
@@ -307,7 +310,8 @@ const EventCalendar = () => {
       start_date: event.start_date,
       end_date: event.end_date,
       location: event.location || '',
-      event_type: event.event_type
+      event_type: event.event_type,
+      image_url: event.image_url || ''
     });
 
     // Fetch existing participants
@@ -335,7 +339,8 @@ const EventCalendar = () => {
       start_date: '',
       end_date: '',
       location: '',
-      event_type: 'meeting'
+      event_type: 'meeting',
+      image_url: ''
     });
     setSelectedParticipants([]);
     setEditingEvent(null);
@@ -505,6 +510,19 @@ const EventCalendar = () => {
                 </Select>
               </div>
 
+              <div className="grid gap-1.5">
+                <Label htmlFor="image_url" className="text-xs sm:text-sm font-medium">Event Image URL</Label>
+                <Input
+                  id="image_url"
+                  placeholder="Enter image URL (optional)"
+                  value={newEvent.image_url}
+                  onChange={(e) => setNewEvent({ ...newEvent, image_url: e.target.value })}
+                  className="text-sm h-9"
+                  type="url"
+                />
+                <p className="text-xs text-gray-500">Add a visual to make your event more engaging</p>
+              </div>
+
               {/* Participants Selection */}
               <div className="grid gap-1.5">
                 <Label className="text-xs sm:text-sm font-medium flex items-center gap-1">
@@ -570,6 +588,19 @@ const EventCalendar = () => {
             return (
               <Card key={event.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2 sm:pb-3">
+                  {event.image_url && (
+                    <div className="mb-3">
+                      <img 
+                        src={event.image_url} 
+                        alt={event.title}
+                        className="w-full h-32 sm:h-40 object-cover rounded-md"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-base sm:text-lg truncate">{event.title}</CardTitle>

@@ -26,7 +26,7 @@ export const useUserRole = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('role, department_id, departments(head_user_id)')
+          .select('role, department_id, departments!profiles_department_id_fkey(head_user_id)')
           .eq('id', user.id)
           .single();
 

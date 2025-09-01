@@ -151,6 +151,7 @@ export type Database = {
           end_date: string
           event_type: string | null
           id: string
+          image_url: string | null
           location: string | null
           start_date: string
           title: string
@@ -163,6 +164,7 @@ export type Database = {
           end_date: string
           event_type?: string | null
           id?: string
+          image_url?: string | null
           location?: string | null
           start_date: string
           title: string
@@ -175,6 +177,7 @@ export type Database = {
           end_date?: string
           event_type?: string | null
           id?: string
+          image_url?: string | null
           location?: string | null
           start_date?: string
           title?: string
