@@ -367,6 +367,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_update_user_role: {
+        Args: { new_role: string; target_user_id: string }
+        Returns: boolean
+      }
       can_user_create_content: {
         Args: Record<PropertyKey, never>
         Returns: boolean
