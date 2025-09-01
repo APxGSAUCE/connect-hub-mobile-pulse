@@ -254,7 +254,7 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
             {/* Mobile-optimized tab navigation with better spacing */}
-            <TabsList className={`grid w-full ${userRole === 'SUPER_ADMIN' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'} mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm mx-1`}>
+            <TabsList className={`grid w-full ${userRole === 'super_admin' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'} mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm mx-1`}>
               <TabsTrigger 
                 value="dashboard" 
                 className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
@@ -291,7 +291,7 @@ const Index = () => {
                 <span className="hidden xs:inline">Team</span>
                 <span className="xs:hidden">People</span>
               </TabsTrigger>
-              {(userRole === 'SUPER_ADMIN' || userRole === 'admin') && (
+              {(userRole === 'super_admin' || userRole === 'admin') && (
                 <TabsTrigger 
                   value="admin" 
                   className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-red-50 data-[state=active]:text-red-600"
