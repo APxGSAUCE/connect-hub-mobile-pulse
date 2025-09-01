@@ -21,7 +21,8 @@ import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { notificationService } from "@/services/notificationService";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
-import { AdminVerificationCenter } from "@/components/AdminVerificationCenter";
+import AdminDashboard from "@/components/AdminDashboard";
+
 
 interface DashboardStats {
   total_messages: number;
@@ -55,6 +56,7 @@ const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [userRole, setUserRole] = useState<string>('');
   const [stats, setStats] = useState<DashboardStats>({
     total_messages: 0,
     unread_messages: 0,
@@ -139,9 +141,27 @@ const Index = () => {
 
   useEffect(() => {
     if (user && !authLoading) {
+      fetchUserRole();
       fetchDashboardData();
     }
   }, [user, authLoading, fetchDashboardData]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      setUserRole(data.role);
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  };
 
   // Initialize real-time notifications
   useRealtimeNotifications({ 
@@ -234,7 +254,7 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
             {/* Mobile-optimized tab navigation with better spacing */}
-            <TabsList className="grid w-full grid-cols-5 mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm mx-1">
+            <TabsList className={`grid w-full ${userRole === 'SUPER_ADMIN' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'} mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm mx-1`}>
               <TabsTrigger 
                 value="dashboard" 
                 className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
@@ -271,8 +291,17 @@ const Index = () => {
                 <span className="hidden xs:inline">Team</span>
                 <span className="xs:hidden">People</span>
               </TabsTrigger>
+              {(userRole === 'SUPER_ADMIN' || userRole === 'admin') && (
+                <TabsTrigger 
+                  value="admin" 
+                  className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-red-50 data-[state=active]:text-red-600"
+                >
+                  <Menu className="w-4 h-4" />
+                  <span>Admin</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger 
-                value="admin" 
+                value="profile" 
                 className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
                 <Avatar className="w-4 h-4">
@@ -280,7 +309,7 @@ const Index = () => {
                     {getInitials(user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
-                <span>Admin</span>
+                <span>Profile</span>
               </TabsTrigger>
             </TabsList>
 
@@ -473,7 +502,11 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="admin" className="h-full overflow-y-auto">
-                <AdminVerificationCenter />
+                <AdminDashboard />
+              </TabsContent>
+
+              <TabsContent value="profile" className="h-full overflow-y-auto">
+                <ProfileMenu />
               </TabsContent>
             </div>
           </Tabs>
