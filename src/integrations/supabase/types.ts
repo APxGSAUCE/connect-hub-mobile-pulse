@@ -374,6 +374,10 @@ export type Database = {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
       }
+      can_user_access_event: {
+        Args: { event_id_param: string }
+        Returns: boolean
+      }
       can_user_create_content: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -398,19 +402,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
-          department_id: string
           first_name: string
           id: string
           last_name: string
           position: string
-          status: string
         }[]
       }
       get_employee_details_admin: {
         Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
-          created_at: string
           department_id: string
           email: string
           employee_id: string
@@ -419,9 +420,7 @@ export type Database = {
           last_name: string
           phone: string
           position: string
-          role: string
           status: string
-          updated_at: string
         }[]
       }
       get_unread_message_count: {
