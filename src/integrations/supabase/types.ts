@@ -395,6 +395,10 @@ export type Database = {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
       }
+      is_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       mark_message_as_read: {
         Args: { message_id_param: string; user_id_param: string }
         Returns: undefined
