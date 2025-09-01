@@ -380,7 +380,7 @@ export type Database = {
         Returns: string
       }
       get_dashboard_stats: {
-        Args: { user_id: string }
+        Args: { user_id_param: string }
         Returns: Json
       }
       get_unread_message_count: {
