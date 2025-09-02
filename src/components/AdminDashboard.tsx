@@ -161,12 +161,29 @@ export const AdminDashboard = () => {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      console.log('Attempting to update user role:', { userId, newRole, currentUser: user?.id });
+      
+      // Check if user session is still valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
+        toast({
+          title: "Authentication Error",
+          description: "Please refresh the page and try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -178,7 +195,7 @@ export const AdminDashboard = () => {
       console.error('Error updating user role:', error);
       toast({
         title: "Error",
-        description: "Failed to update user role.",
+        description: `Failed to update user role: ${error.message || 'Unknown error'}`,
         variant: "destructive"
       });
     }
