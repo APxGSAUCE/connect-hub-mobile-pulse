@@ -547,7 +547,6 @@ const EventCalendar = () => {
                     <SelectItem value="conference">Conference</SelectItem>
                     <SelectItem value="social">Social</SelectItem>
                     <SelectItem value="training">Training</SelectItem>
-                    <SelectItem value="fun_run">Fun Run</SelectItem>
                     <SelectItem value="program">Program</SelectItem>
                     <SelectItem value="holiday">Holiday</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
