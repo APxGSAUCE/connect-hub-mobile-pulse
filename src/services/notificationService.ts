@@ -241,7 +241,7 @@ class NotificationService {
         // Show a welcome notification
         await this.showSystemNotification(
           'Notifications Enabled!',
-          'You will now receive real-time updates from One Ilocos Sur Portal'
+          'You will now receive real-time updates from PGIS Employee Portal'
         );
       }
       return permission;

@@ -1,7 +1,7 @@
 
 {
-  "name": "One Ilocos Sur Portal",
-  "short_name": "One Ilocos Sur",
+  "name": "PGIS Employee Portal",
+  "short_name": "PGIS Employee Portal",
   "description": "Employee collaboration and communication platform",
   "start_url": "/",
   "display": "standalone",
@@ -74,7 +74,7 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "One Ilocos Sur Portal Dashboard"
+      "label": "PGIS Employee Dashboard"
     }
   ],
   "display_override": ["window-controls-overlay", "minimal-ui", "standalone", "browser"],

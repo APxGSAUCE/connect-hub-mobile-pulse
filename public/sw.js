@@ -165,7 +165,7 @@ self.addEventListener('push', (event) => {
   console.log('Push notification received:', event);
   
   let notificationData = {
-    title: 'One Ilocos Sur Portal',
+    title: 'PGIS Employee Portal',
     body: 'New notification',
     icon: '/icon-192.png',
     badge: '/icon-192.png',

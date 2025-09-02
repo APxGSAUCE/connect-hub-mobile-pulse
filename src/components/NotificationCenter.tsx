@@ -70,7 +70,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationC
     if (document.hidden || !document.hasFocus()) {
       notificationService.showSystemNotification(
         'New Notification',
-        'You have a new notification in One Ilocos Sur Portal'
+        'You have a new notification in PGIS Employee Portal'
       );
     }
   }, [fetchNotifications]), [user]);
