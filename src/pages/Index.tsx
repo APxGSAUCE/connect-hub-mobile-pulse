@@ -117,13 +117,52 @@ const Index = () => {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      const activity: RecentActivity[] = (notifications || []).map(notification => ({
-        id: notification.id,
-        type: 'notification' as const,
-        title: notification.title,
-        description: notification.message,
-        time: new Date(notification.created_at).toLocaleString()
-      }));
+      // Fetch recent events for activity feed
+      const { data: recentEventsForActivity } = await supabase
+        .from('events')
+        .select(`
+          id, 
+          title, 
+          created_at, 
+          event_type, 
+          location,
+          created_by
+        `)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      // Get creator details for events
+      const creatorIds = recentEventsForActivity?.map(event => event.created_by) || [];
+      const { data: creators } = creatorIds.length > 0 ? await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', creatorIds) : { data: [] };
+
+      // Combine notifications and events for activity feed
+      const activity: RecentActivity[] = [
+        // Add recent events to activity feed
+        ...(recentEventsForActivity || []).map(event => {
+          const creator = creators?.find(c => c.id === event.created_by);
+          return {
+            id: event.id,
+            type: 'event' as const,
+            title: `New Event: ${event.title}`,
+            description: `${event.event_type}${event.location ? ` at ${event.location}` : ''}`,
+            time: new Date(event.created_at).toLocaleString(),
+            user: {
+              name: creator ? `${creator.first_name || ''} ${creator.last_name || ''}`.trim() : 'Unknown User'
+            }
+          };
+        }),
+        // Add notifications
+        ...(notifications || []).map(notification => ({
+          id: notification.id,
+          type: 'notification' as const,
+          title: notification.title,
+          description: notification.message,
+          time: new Date(notification.created_at).toLocaleString()
+        }))
+      ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5);
 
       setRecentActivity(activity);
 

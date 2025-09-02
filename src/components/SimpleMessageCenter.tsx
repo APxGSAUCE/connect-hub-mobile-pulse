@@ -315,8 +315,12 @@ const SimpleMessageCenter = () => {
 
       if (error) throw error;
 
-      // Filter out current user and only show colleagues
-      const colleagues = data?.filter(colleague => colleague.id !== user.id) || [];
+      // Filter out current user and only show colleagues, and add missing department_id
+      const colleagues = data?.filter(colleague => colleague.id !== user.id).map(colleague => ({
+        ...colleague,
+        department_id: null, // The function doesn't return department_id for security
+        email: null // The function doesn't return email for security
+      })) || [];
       setEmployees(colleagues);
     } catch (error) {
       console.error('Error fetching employees:', error);
