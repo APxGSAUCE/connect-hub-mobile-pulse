@@ -60,13 +60,7 @@ const EmployeeManagement = () => {
 
       if (error) throw error;
       
-      // Apply department filter if needed
-      let filteredData = data || [];
-      if (selectedDepartment !== 'all') {
-        filteredData = filteredData.filter(emp => emp.department_id === selectedDepartment);
-      }
-      
-      const typedEmployees = filteredData.map(emp => ({
+      const typedEmployees = (data || []).map(emp => ({
         ...emp,
         status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive'
       }));
@@ -170,17 +164,16 @@ const EmployeeManagement = () => {
     }
   };
 
-  const filteredEmployees = employees.filter(emp =>
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const nameMatch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const emailMatch = emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const departmentMatch = selectedDepartment === 'all' || emp.department_id === selectedDepartment;
+    
+    return (nameMatch || emailMatch) && departmentMatch;
+  });
 
   const handleDepartmentChange = (departmentId: string) => {
     setSelectedDepartment(departmentId);
-    // Re-fetch employees with new department filter
-    setTimeout(() => {
-      fetchEmployees();
-    }, 100);
   };
 
   if (loading || roleLoading) {

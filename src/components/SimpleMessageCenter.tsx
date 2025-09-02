@@ -17,6 +17,7 @@ import { MessageStatus } from "@/components/MessageStatus";
 import { useUserRole } from "@/hooks/useUserRole";
 import { PermissionBanner } from "@/components/PermissionBanner";
 import { MessageDeleteButton } from "@/components/MessageDeleteButton";
+import { CreateGroupDialog } from "@/components/CreateGroupDialog";
 
 interface ChatGroup {
   id: string;
@@ -59,6 +60,11 @@ interface Employee {
   status?: string | null; // Added from the new function
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
 const SimpleMessageCenter = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -68,12 +74,14 @@ const SimpleMessageCenter = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Initialize notifications
@@ -310,30 +318,55 @@ const SimpleMessageCenter = () => {
     if (!user) return;
 
     try {
-      // Use the new secure function to get department colleagues (no email exposure)
-      const { data, error } = await supabase
-        .rpc('get_department_colleagues');
+      // Check if user is admin/super_admin to get full details
+      if (userRole?.can_manage_users) {
+        // Use admin function to get full employee details
+        const { data, error } = await supabase
+          .rpc('get_employee_details_admin');
+        
+        if (error) throw error;
+        setEmployees(data?.filter(emp => emp.id !== user.id) || []);
+      } else {
+        // Use the secure function to get department colleagues
+        const { data, error } = await supabase
+          .rpc('get_department_colleagues');
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Filter out current user and only show colleagues, and add missing department_id
-      const colleagues = data?.filter(colleague => colleague.id !== user.id).map(colleague => ({
-        ...colleague,
-        department_id: null, // The function doesn't return department_id for security
-        email: null // The function doesn't return email for security
-      })) || [];
-      setEmployees(colleagues);
+        // Filter out current user and only show colleagues
+        const colleagues = data?.filter(colleague => colleague.id !== user.id).map(colleague => ({
+          ...colleague,
+          department_id: null, // The function doesn't return department_id for security
+          email: null // The function doesn't return email for security
+        })) || [];
+        setEmployees(colleagues);
+      }
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
   useEffect(() => {
-    if (user) {
+    if (user && userRole !== null) {
       fetchGroups();
       fetchEmployees();
+      fetchDepartments();
     }
-  }, [user]);
+  }, [user, userRole]);
 
   // Set up real-time subscriptions
   useRealtimeSubscription('messages', () => {
@@ -548,64 +581,30 @@ const SimpleMessageCenter = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Chat Type</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setNewGroupName("");
-                      setNewGroupDescription("");
-                    }}
-                    className="h-20 flex flex-col"
-                  >
-                    <Users className="w-6 h-6 mb-2" />
-                    Group Chat
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedEmployee("");
-                    }}
-                    className="h-20 flex flex-col"
-                  >
-                    <MessageSquare className="w-6 h-6 mb-2" />
-                    Direct Message
-                  </Button>
-                </div>
-              </div>
-
-              {/* Group Chat Form */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="groupName">Group Name</Label>
-                  <Input
-                    id="groupName"
-                    placeholder="Enter group name"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                  />
+                  <Label>Chat Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCreateGroupOpen(true)}
+                      className="h-20 flex flex-col"
+                    >
+                      <Users className="w-6 h-6 mb-2" />
+                      Group Chat
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedEmployee("");
+                      }}
+                      className="h-20 flex flex-col"
+                    >
+                      <MessageSquare className="w-6 h-6 mb-2" />
+                      Direct Message
+                    </Button>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="groupDescription">Description (Optional)</Label>
-                  <Input
-                    id="groupDescription"
-                    placeholder="Enter group description"
-                    value={newGroupDescription}
-                    onChange={(e) => setNewGroupDescription(e.target.value)}
-                  />
-                </div>
-
-                <Button 
-                  onClick={handleCreateGroup} 
-                  disabled={!newGroupName.trim()}
-                  className="w-full"
-                >
-                  Create Group
-                </Button>
-              </div>
 
               {/* Direct Message Form */}
               <div className="space-y-4 border-t pt-4">
@@ -637,6 +636,18 @@ const SimpleMessageCenter = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Create Group Dialog */}
+        <CreateGroupDialog
+          isOpen={isCreateGroupOpen}
+          onClose={() => setIsCreateGroupOpen(false)}
+          employees={employees}
+          departments={departments}
+          onGroupCreated={() => {
+            fetchGroups();
+            setIsCreateGroupOpen(false);
+          }}
+        />
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">

@@ -154,64 +154,66 @@ export const ApprovalCenter = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-20 md:pb-6 px-1 sm:px-0">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <CheckCircle className="w-5 h-5" />
-            <span>User Approval Center</span>
-            <Badge variant="secondary">{requests.length} pending</Badge>
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 text-base sm:text-lg">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>User Approval Center</span>
+            </div>
+            <Badge variant="secondary" className="self-start sm:self-auto">{requests.length} pending</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-6">
           {requests.length === 0 ? (
             <div className="text-center py-8">
               <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
               <p className="text-gray-600">No pending approval requests</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {requests.map((request) => (
                 <Card key={request.id} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-3 sm:space-y-0">
+                      <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
                         <Avatar className="w-12 h-12">
                           <AvatarFallback>
                             {getInitials(request.first_name, request.last_name)}
                           </AvatarFallback>
                         </Avatar>
                         
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex-1 min-w-0">
                           <div>
-                            <h3 className="font-semibold">
+                            <h3 className="font-semibold text-sm sm:text-base">
                               {request.first_name} {request.last_name}
                             </h3>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 text-xs sm:text-sm text-gray-600">
                               <div className="flex items-center space-x-1">
-                                <Mail className="w-4 h-4" />
-                                <span>{request.email}</span>
+                                <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="truncate">{request.email}</span>
                               </div>
                               <div className="flex items-center space-x-1">
-                                <User className="w-4 h-4" />
+                                <User className="w-3 h-3 sm:w-4 sm:h-4" />
                                 <span>{request.employee_id}</span>
                               </div>
                               <div className="flex items-center space-x-1">
-                                <Building className="w-4 h-4" />
-                                <span>{request.position}</span>
+                                <Building className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="truncate">{request.position}</span>
                               </div>
                             </div>
                             {request.department_name && (
-                              <div className="text-sm text-gray-600">
+                              <div className="text-xs sm:text-sm text-gray-600 truncate">
                                 Department: {request.department_name}
                               </div>
                             )}
                           </div>
                           
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="outline" className="flex items-center space-x-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                            <Badge variant="outline" className="flex items-center space-x-1 self-start">
                               <Clock className="w-3 h-3" />
-                              <span>Pending Review</span>
+                              <span className="text-xs">Pending Review</span>
                             </Badge>
                             <span className="text-xs text-gray-500">
                               Submitted {new Date(request.created_at).toLocaleDateString()}
@@ -220,24 +222,24 @@ export const ApprovalCenter = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-col sm:flex-row w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-green-600 border-green-600 hover:bg-green-50"
+                          className="text-green-600 border-green-600 hover:bg-green-50 w-full sm:w-auto"
                           onClick={() => handleApprove(request.id)}
                         >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Approve
+                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span className="text-xs sm:text-sm">Approve</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-red-600 border-red-600 hover:bg-red-50"
+                          className="text-red-600 border-red-600 hover:bg-red-50 w-full sm:w-auto"
                           onClick={() => setSelectedRequest(request.id)}
                         >
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Reject
+                          <XCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span className="text-xs sm:text-sm">Reject</span>
                         </Button>
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ interface Employee {
   position: string | null;
   status: 'active' | 'muted' | 'blocked' | 'inactive';
   department_id: string | null;
+  avatar_url?: string | null;
 }
 
 interface EmployeeCardProps {
@@ -40,6 +41,7 @@ export const EmployeeCard = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Avatar className="w-12 h-12">
+              {employee.avatar_url && <AvatarImage src={employee.avatar_url} alt="Profile" />}
               <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
                 {getInitials(employee.first_name, employee.last_name)}
               </AvatarFallback>

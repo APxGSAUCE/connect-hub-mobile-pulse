@@ -257,11 +257,23 @@ const EventCalendar = () => {
 
         // Add participants to the event
         if (selectedParticipants.length > 0) {
-          const participantData = selectedParticipants.map(participantId => ({
-            event_id: data.id,
-            user_id: participantId,
-            status: 'invited'
-          }));
+          let participantData;
+          
+          if (selectedParticipants.includes('all-users')) {
+            // If "All Users" is selected, add all employees
+            participantData = employees.map(employee => ({
+              event_id: data.id,
+              user_id: employee.id,
+              status: 'invited'
+            }));
+          } else {
+            // Add only selected participants
+            participantData = selectedParticipants.map(participantId => ({
+              event_id: data.id,
+              user_id: participantId,
+              status: 'invited'
+            }));
+          }
 
           const { error: participantError } = await supabase
             .from('event_participants')
@@ -628,6 +640,23 @@ const EventCalendar = () => {
                 <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
                   {employees.length > 0 ? (
                     <div className="space-y-1.5">
+                      {/* All Users option for admins */}
+                      {userRole?.can_manage_users && (
+                        <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+                          <Checkbox
+                            id="all-users"
+                            checked={selectedParticipants.includes('all-users')}
+                            onCheckedChange={() => toggleParticipant('all-users')}
+                            className="h-3.5 w-3.5"
+                          />
+                          <label
+                            htmlFor="all-users"
+                            className="text-xs sm:text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            All Users
+                          </label>
+                        </div>
+                      )}
                       {employees.map((employee) => (
                         <div key={employee.id} className="flex items-center space-x-2">
                           <Checkbox
