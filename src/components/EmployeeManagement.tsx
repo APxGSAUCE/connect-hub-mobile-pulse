@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeFilters } from "./EmployeeFilters";
 import { EmployeeList } from "./EmployeeList";
@@ -26,6 +27,7 @@ interface Department {
 const EmployeeManagement = () => {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const { userRole, loading: roleLoading } = useUserRole();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,16 +35,34 @@ const EmployeeManagement = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
   useEffect(() => {
-    fetchEmployees();
-    fetchDepartments();
-  }, []);
+    if (!roleLoading && userRole) {
+      fetchEmployees();
+      fetchDepartments();
+    }
+  }, [roleLoading, userRole]);
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      // Use the secure admin function to get full employee details
-      const { data, error } = await supabase
-        .rpc('get_employee_details_admin');
+      let data, error;
+      
+      // Check if user has admin/super_admin privileges or is department head
+      if (userRole?.can_manage_users) {
+        // For admins and super_admins, try to get full employee details
+        const result = await supabase.rpc('get_employee_details_admin');
+        data = result.data;
+        error = result.error;
+      } else if (userRole?.is_department_head) {
+        // For department heads, get department colleagues
+        const result = await supabase.rpc('get_department_colleagues');
+        data = result.data;
+        error = result.error;
+      } else {
+        // For regular employees, get limited colleague info
+        const result = await supabase.rpc('get_department_colleagues');
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
       
@@ -62,7 +82,7 @@ const EmployeeManagement = () => {
       console.error('Error fetching employees:', error);
       toast({
         title: "Error",
-        description: "Failed to load employees.",
+        description: "Failed to load employees. Please check your permissions.",
         variant: "destructive"
       });
     } finally {
@@ -159,7 +179,7 @@ const EmployeeManagement = () => {
     }, 100);
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="space-y-6 pb-20 md:pb-6">
         <div className="flex items-center justify-center h-64">
@@ -191,7 +211,7 @@ const EmployeeManagement = () => {
       {/* Employee List */}
       <EmployeeList
         employees={filteredEmployees}
-        isAdmin={true}
+        isAdmin={userRole?.can_manage_users || false}
         onDirectMessage={startDirectMessage}
         onStatusUpdate={updateEmployeeStatus}
       />
