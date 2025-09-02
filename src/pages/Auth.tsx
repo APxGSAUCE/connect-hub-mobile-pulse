@@ -358,7 +358,7 @@ const Auth = () => {
                                 : "Select your department"
                         } />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-[60]">
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-[60] backdrop-blur-sm dark:bg-gray-800 dark:border-gray-600">
                         {loadingDepartments ? (
                           <SelectItem value="loading" disabled>
                             <div className="flex items-center space-x-2">
