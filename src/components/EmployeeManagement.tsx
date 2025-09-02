@@ -7,6 +7,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeFilters } from "./EmployeeFilters";
 import { EmployeeList } from "./EmployeeList";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 
 interface Employee {
   id: string;
@@ -33,13 +34,6 @@ const EmployeeManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-
-  useEffect(() => {
-    if (!roleLoading && userRole) {
-      fetchEmployees();
-      fetchDepartments();
-    }
-  }, [roleLoading, userRole]);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -116,6 +110,16 @@ const EmployeeManagement = () => {
     }
   };
 
+  useEffect(() => {
+    if (!roleLoading && userRole) {
+      fetchEmployees();
+      fetchDepartments();
+    }
+  }, [roleLoading, userRole]);
+
+  // Set up real-time subscriptions
+  useRealtimeSubscription('profiles', fetchEmployees, [userRole]);
+  useRealtimeSubscription('departments', fetchDepartments, [userRole]);
 
   const updateEmployeeStatus = async (employeeId: string, status: Employee['status']) => {
     try {

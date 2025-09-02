@@ -198,7 +198,7 @@ const Auth = () => {
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: redirectUrl,
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
               first_name: firstName.trim(),
               last_name: lastName.trim(),

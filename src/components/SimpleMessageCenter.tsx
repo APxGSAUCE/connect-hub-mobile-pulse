@@ -16,6 +16,7 @@ import { notificationService } from "@/services/notificationService";
 import { MessageStatus } from "@/components/MessageStatus";
 import { useUserRole } from "@/hooks/useUserRole";
 import { PermissionBanner } from "@/components/PermissionBanner";
+import { MessageDeleteButton } from "@/components/MessageDeleteButton";
 
 interface ChatGroup {
   id: string;
@@ -779,38 +780,48 @@ const SimpleMessageCenter = () => {
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-gray-100 text-gray-900'
                               }`}
-                            >
-                              {message.sender_id !== user?.id && (
-                                <p className="text-xs font-medium mb-1 opacity-75">
-                                  {getSenderName(message)}
-                                </p>
-                              )}
+                             >
+                               <div className="flex items-center justify-between mb-1">
+                                 <div className="flex items-center space-x-2">
+                                   {message.sender_id !== user?.id && (
+                                     <p className="text-xs font-medium opacity-75">
+                                       {getSenderName(message)}
+                                     </p>
+                                   )}
+                                 </div>
+                                 <MessageDeleteButton
+                                   messageId={message.id}
+                                   senderId={message.sender_id}
+                                   currentUserId={user?.id || ''}
+                                   onDelete={() => fetchMessages(selectedGroup.id)}
+                                 />
+                               </div>
                                <p className="text-sm">{message.content}</p>
-                                <div className="flex items-center justify-between mt-1">
-                                  <p
-                                    className={`text-xs ${
-                                      message.sender_id === user?.id
-                                        ? 'text-blue-100'
-                                        : 'text-gray-500'
-                                    }`}
-                                  >
-                                    {new Date(message.created_at).toLocaleTimeString()}
-                                  </p>
-                                  <div className="flex items-center space-x-1">
-                                    {message.sender_id === user?.id && message.message_status && (
-                                      <MessageStatus 
-                                        status={message.message_status} 
-                                        className={message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}
-                                      />
-                                    )}
-                                    {message.sender_id === user?.id && message.read_by && message.read_by > 0 && (
-                                      <span className={`text-xs ${message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}`}>
-                                        Seen by {message.read_by}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                            </div>
+                               <div className="flex items-center justify-between mt-1">
+                                 <p
+                                   className={`text-xs ${
+                                     message.sender_id === user?.id
+                                       ? 'text-blue-100'
+                                       : 'text-gray-500'
+                                   }`}
+                                 >
+                                   {new Date(message.created_at).toLocaleTimeString()}
+                                 </p>
+                                 <div className="flex items-center space-x-1">
+                                   {message.sender_id === user?.id && message.message_status && (
+                                     <MessageStatus 
+                                       status={message.message_status} 
+                                       className={message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}
+                                     />
+                                   )}
+                                   {message.sender_id === user?.id && message.read_by && message.read_by > 0 && (
+                                     <span className={`text-xs ${message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}`}>
+                                       Seen by {message.read_by}
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
+                             </div>
                           </div>
                         ))}
                       </div>

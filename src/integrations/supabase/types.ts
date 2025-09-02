@@ -302,6 +302,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approval_notes: string | null
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
           approved_at: string | null
           approved_by: string | null
           avatar_url: string | null
@@ -314,12 +316,17 @@ export type Database = {
           last_name: string | null
           phone: string | null
           position: string | null
+          rejected_reason: string | null
           role: string | null
           status: string | null
           updated_at: string | null
           verification_documents: Json | null
         }
         Insert: {
+          approval_notes?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
@@ -332,12 +339,17 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           position?: string | null
+          rejected_reason?: string | null
           role?: string | null
           status?: string | null
           updated_at?: string | null
           verification_documents?: Json | null
         }
         Update: {
+          approval_notes?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
@@ -350,6 +362,7 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           position?: string | null
+          rejected_reason?: string | null
           role?: string | null
           status?: string | null
           updated_at?: string | null
@@ -370,6 +383,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_delete_message: {
+        Args: { message_id_param: string }
+        Returns: boolean
+      }
       can_update_user_role: {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
@@ -423,6 +440,24 @@ export type Database = {
           status: string
         }[]
       }
+      get_pending_approvals: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          approval_notes: string
+          approval_status: Database["public"]["Enums"]["approval_status"]
+          created_at: string
+          department_id: string
+          department_name: string
+          email: string
+          employee_id: string
+          first_name: string
+          id: string
+          last_name: string
+          phone: string
+          position: string
+          rejected_reason: string
+        }[]
+      }
       get_unread_message_count: {
         Args: { user_id_param: string }
         Returns: number
@@ -445,7 +480,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      approval_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -572,6 +607,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      approval_status: ["pending", "approved", "rejected"],
+    },
   },
 } as const

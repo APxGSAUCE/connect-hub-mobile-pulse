@@ -10,6 +10,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { ApprovalCenter } from '@/components/ApprovalCenter';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface UserProfile {
   id: string;
@@ -241,6 +243,15 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="approvals">User Approvals</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-6">
+          {/* Stats Cards and existing content */}
+
       {/* Stats Cards - Mobile optimized grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
@@ -424,6 +435,12 @@ export const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+        
+        <TabsContent value="approvals">
+          <ApprovalCenter />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

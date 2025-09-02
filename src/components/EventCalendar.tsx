@@ -686,15 +686,16 @@ const EventCalendar = () => {
                 <CardHeader className="pb-2 sm:pb-3">
                   {event.image_url && (
                     <div className="mb-3">
-                      <img 
-                        src={event.image_url} 
-                        alt={event.title}
-                        className="w-full h-32 sm:h-40 object-cover rounded-md"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                        }}
-                      />
+                       <img 
+                         src={event.image_url} 
+                         alt={event.title}
+                         className="w-full h-64 sm:h-80 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                         onClick={() => window.open(event.image_url, '_blank')}
+                         onError={(e) => {
+                           const target = e.target as HTMLImageElement;
+                           target.style.display = 'none';
+                         }}
+                       />
                     </div>
                   )}
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
