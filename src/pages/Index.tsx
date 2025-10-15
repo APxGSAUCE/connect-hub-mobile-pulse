@@ -274,8 +274,8 @@ const Index = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center safe-area-inset" style={{ backgroundImage: 'url(/images/background.jpg)' }}>
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen bg-background flex items-center justify-center safe-area-inset">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -286,7 +286,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-cover bg-center bg-no-repeat flex flex-col ios-fix" style={{ backgroundImage: 'url(/images/background.jpg)' }}>
+    <div className="min-h-screen bg-background flex flex-col ios-fix">
       <AppHeader 
         unreadNotifications={stats.unread_notifications}
         onNotificationCountChange={(count) => setStats(prev => ({ ...prev, unread_notifications: count }))}
