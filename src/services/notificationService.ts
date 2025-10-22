@@ -2,30 +2,31 @@
 class NotificationService {
   private registration: ServiceWorkerRegistration | null = null;
   private permissionGranted: boolean = false;
+  private initialized: boolean = false;
 
   async initialize() {
+    if (this.initialized) {
+      return;
+    }
+
+    this.initialized = true;
+
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       try {
         this.registration = await navigator.serviceWorker.register('/sw.js', {
           scope: '/'
         });
         
-        // Wait for the service worker to be ready
         await navigator.serviceWorker.ready;
         
-        console.log('Service Worker registered successfully');
-        
-        // Check current permission status
         this.permissionGranted = Notification.permission === 'granted';
         
-        // Listen for service worker updates
         this.registration.addEventListener('updatefound', () => {
-          console.log('Service Worker update found');
           const newWorker = this.registration?.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('New Service Worker installed');
+                console.log('Service Worker updated');
               }
             });
           }
@@ -45,20 +46,12 @@ class NotificationService {
       }
       
       if (Notification.permission === 'denied') {
-        console.warn('Notification permission denied');
         return false;
       }
       
       try {
         const permission = await Notification.requestPermission();
         this.permissionGranted = permission === 'granted';
-        
-        if (this.permissionGranted) {
-          console.log('Notification permission granted');
-        } else {
-          console.warn('Notification permission denied by user');
-        }
-        
         return this.permissionGranted;
       } catch (error) {
         console.error('Error requesting notification permission:', error);

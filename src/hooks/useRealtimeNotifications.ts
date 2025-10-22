@@ -117,12 +117,9 @@ export const useRealtimeNotifications = ({ onNotificationReceived }: RealtimeNot
   useEffect(() => {
     if (!user) return;
 
-    // Initialize notification service
-    notificationService.initialize();
-
-    // Subscribe to real-time notifications
+    // Subscribe to real-time notifications with unique channel name
     const notificationChannel = supabase
-      .channel('realtime-notifications')
+      .channel(`realtime-notifications-${user.id}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

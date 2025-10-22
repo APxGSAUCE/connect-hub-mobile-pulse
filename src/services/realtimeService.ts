@@ -5,6 +5,7 @@ import { RealtimeChannel } from "@supabase/supabase-js";
 class RealtimeService {
   private channels: Map<string, RealtimeChannel> = new Map();
   private subscribers: Map<string, Set<() => void>> = new Map();
+  private channelStatus: Map<string, 'connecting' | 'connected' | 'disconnected'> = new Map();
 
   subscribe(channelName: string, callback: () => void) {
     // Add callback to subscribers
@@ -13,8 +14,8 @@ class RealtimeService {
     }
     this.subscribers.get(channelName)!.add(callback);
 
-    // Create channel if it doesn't exist
-    if (!this.channels.has(channelName)) {
+    // Create channel if it doesn't exist and is not connecting
+    if (!this.channels.has(channelName) && this.channelStatus.get(channelName) !== 'connecting') {
       this.createChannel(channelName);
     }
 
@@ -31,12 +32,13 @@ class RealtimeService {
   }
 
   private createChannel(channelName: string) {
+    this.channelStatus.set(channelName, 'connecting');
     let channel: RealtimeChannel;
 
     switch (channelName) {
       case 'messages':
         channel = supabase
-          .channel('messages-realtime')
+          .channel(`messages-realtime-${Date.now()}`)
           .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -56,7 +58,7 @@ class RealtimeService {
 
       case 'events':
         channel = supabase
-          .channel('events-realtime')
+          .channel(`events-realtime-${Date.now()}`)
           .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -71,7 +73,7 @@ class RealtimeService {
 
       case 'profiles':
         channel = supabase
-          .channel('profiles-realtime')
+          .channel(`profiles-realtime-${Date.now()}`)
           .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -81,7 +83,7 @@ class RealtimeService {
 
       case 'notifications':
         channel = supabase
-          .channel('notifications-realtime')
+          .channel(`notifications-realtime-${Date.now()}`)
           .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -90,10 +92,14 @@ class RealtimeService {
         break;
 
       default:
-        channel = supabase.channel(channelName);
+        channel = supabase.channel(`${channelName}-${Date.now()}`);
     }
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        this.channelStatus.set(channelName, 'connected');
+      }
+    });
     this.channels.set(channelName, channel);
   }
 
@@ -116,6 +122,7 @@ class RealtimeService {
       supabase.removeChannel(channel);
       this.channels.delete(channelName);
       this.subscribers.delete(channelName);
+      this.channelStatus.set(channelName, 'disconnected');
     }
   }
 

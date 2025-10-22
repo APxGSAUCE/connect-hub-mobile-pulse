@@ -68,6 +68,11 @@ const Index = () => {
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Initialize notification service once on mount
+  useEffect(() => {
+    notificationService.initialize();
+  }, []);
+
   // Check URL parameters for tab selection and handle shortcuts
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

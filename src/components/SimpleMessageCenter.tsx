@@ -84,10 +84,6 @@ const SimpleMessageCenter = () => {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Initialize notifications
-  useEffect(() => {
-    notificationService.initialize();
-  }, []);
 
   const fetchGroups = async () => {
     if (!user) return;
