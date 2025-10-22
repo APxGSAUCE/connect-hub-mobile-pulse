@@ -378,6 +378,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -385,6 +409,10 @@ export type Database = {
     Functions: {
       can_delete_message: {
         Args: { message_id_param: string }
+        Returns: boolean
+      }
+      can_manage_users: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       can_update_user_role: {
@@ -462,6 +490,17 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: number
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_department_head: {
         Args: { dept_id: string }
         Returns: boolean
@@ -474,6 +513,10 @@ export type Database = {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
       }
+      is_super_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -484,6 +527,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "employee" | "dept_head" | "admin" | "super_admin"
       approval_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
@@ -612,6 +656,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["employee", "dept_head", "admin", "super_admin"],
       approval_status: ["pending", "approved", "rejected"],
     },
   },
