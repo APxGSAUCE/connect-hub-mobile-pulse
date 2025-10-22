@@ -24,20 +24,32 @@ export const useUserRole = () => {
       }
 
       try {
-        const { data, error } = await supabase
+        // Fetch role from new user_roles table
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .order('role', { ascending: false }) // Get highest role first
+          .limit(1)
+          .maybeSingle();
+
+        if (roleError) throw roleError;
+
+        // Fetch profile data for department info
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('role, department_id, departments!profiles_department_id_fkey(head_user_id)')
+          .select('department_id, departments!profiles_department_id_fkey(head_user_id)')
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
+        if (profileError) throw profileError;
 
-        const isDepartmentHead = data.departments?.head_user_id === user.id;
-        const role = data.role || 'employee';
+        const isDepartmentHead = profileData.departments?.head_user_id === user.id;
+        const role = roleData?.role || 'employee';
 
         const permissions: UserRole = {
           role,
-          department_id: data.department_id,
+          department_id: profileData.department_id,
           is_department_head: isDepartmentHead,
           can_create_messages: ['super_admin', 'admin'].includes(role) || isDepartmentHead,
           can_create_events: ['super_admin', 'admin'].includes(role) || isDepartmentHead,

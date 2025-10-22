@@ -55,16 +55,20 @@ export const AdminDashboard = () => {
 
   const fetchUserRole = async () => {
     try {
+      // Fetch role from user_roles table
       const { data, error } = await supabase
-        .from('profiles')
+        .from('user_roles')
         .select('role')
-        .eq('id', user?.id)
-        .single();
+        .eq('user_id', user?.id)
+        .order('role', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) throw error;
-      setUserRole(data.role);
+      setUserRole(data?.role || 'employee');
     } catch (error) {
       console.error('Error fetching user role:', error);
+      setUserRole('employee');
     }
   };
 
@@ -175,27 +179,31 @@ export const AdminDashboard = () => {
         return;
       }
 
-      const { error } = await supabase
+      // Update role in both places for backwards compatibility
+      // The trigger will sync from profiles to user_roles
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ role: newRole })
         .eq('id', userId);
 
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        throw profileError;
       }
 
+      // The sync trigger will handle updating user_roles automatically
       toast({
         title: "Success",
         description: "User role updated successfully.",
       });
 
       fetchAllUsers();
-    } catch (error) {
+      fetchUserRole();
+    } catch (error: any) {
       console.error('Error updating user role:', error);
       toast({
         title: "Error",
-        description: `Failed to update user role: ${error.message || 'Unknown error'}`,
+        description: `Failed to update user role: ${error?.message || 'Unknown error'}`,
         variant: "destructive"
       });
     }
