@@ -36,25 +36,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        if (!mounted) return;
-
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Only set loading to false after we've processed the auth state
-        if (loading) {
-          setLoading(false);
-        }
-      }
-    );
-
-    // Get initial session
+    // Get initial session first
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -78,9 +62,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     getInitialSession();
 
+    // Set up auth state listener after getting initial session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
+        if (!mounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Handle sign out event
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+        }
+        
+        // Only set loading to false if we're still loading
+        if (loading) {
+          setLoading(false);
+        }
+      }
+    );
+
+    authSubscription = subscription;
+
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
   }, []);
 

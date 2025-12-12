@@ -194,16 +194,20 @@ const Index = () => {
     if (!user) return;
     
     try {
+      // Fetch role from user_roles table (proper security pattern)
       const { data, error } = await supabase
-        .from('profiles')
+        .from('user_roles')
         .select('role')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id)
+        .order('role', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) throw error;
-      setUserRole(data.role);
+      setUserRole(data?.role || 'employee');
     } catch (error) {
       console.error('Error fetching user role:', error);
+      setUserRole('employee');
     }
   };
 

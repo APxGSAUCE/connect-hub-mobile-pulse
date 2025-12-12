@@ -411,10 +411,7 @@ export type Database = {
         Args: { message_id_param: string }
         Returns: boolean
       }
-      can_manage_users: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      can_manage_users: { Args: never; Returns: boolean }
       can_update_user_role: {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
@@ -423,28 +420,16 @@ export type Database = {
         Args: { event_id_param: string }
         Returns: boolean
       }
-      can_user_create_content: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      can_user_create_content: { Args: never; Returns: boolean }
       create_direct_message_group: {
         Args: { other_user_id: string }
         Returns: string
       }
-      get_current_user_department: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_dashboard_stats: {
-        Args: { user_id_param: string }
-        Returns: Json
-      }
+      get_current_user_department: { Args: never; Returns: string }
+      get_current_user_role: { Args: never; Returns: string }
+      get_dashboard_stats: { Args: { user_id_param: string }; Returns: Json }
       get_department_colleagues: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           first_name: string
@@ -454,7 +439,7 @@ export type Database = {
         }[]
       }
       get_employee_details_admin: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           department_id: string
@@ -469,7 +454,7 @@ export type Database = {
         }[]
       }
       get_pending_approvals: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           approval_notes: string
           approval_status: Database["public"]["Enums"]["approval_status"]
@@ -501,10 +486,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_department_head: {
-        Args: { dept_id: string }
-        Returns: boolean
-      }
+      is_department_head: { Args: { dept_id: string }; Returns: boolean }
       is_group_admin: {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
@@ -513,14 +495,8 @@ export type Database = {
         Args: { group_id_param: string; user_id_param: string }
         Returns: boolean
       }
-      is_super_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_user_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_super_admin: { Args: never; Returns: boolean }
+      is_user_admin: { Args: never; Returns: boolean }
       mark_message_as_read: {
         Args: { message_id_param: string; user_id_param: string }
         Returns: undefined

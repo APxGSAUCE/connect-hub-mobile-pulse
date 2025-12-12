@@ -3,62 +3,77 @@ class NotificationService {
   private registration: ServiceWorkerRegistration | null = null;
   private permissionGranted: boolean = false;
   private initialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
   async initialize() {
     if (this.initialized) {
       return;
     }
 
-    this.initialized = true;
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
 
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      try {
-        this.registration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
-        });
-        
-        await navigator.serviceWorker.ready;
-        
-        this.permissionGranted = Notification.permission === 'granted';
-        
-        this.registration.addEventListener('updatefound', () => {
-          const newWorker = this.registration?.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('Service Worker updated');
-              }
-            });
-          }
-        });
-        
-      } catch (error) {
-        console.error('Service Worker registration failed:', error);
+    this.initializationPromise = this._initialize();
+    return this.initializationPromise;
+  }
+
+  private async _initialize() {
+    try {
+      this.initialized = true;
+
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          this.registration = await navigator.serviceWorker.register('/sw.js', {
+            scope: '/'
+          });
+          
+          await navigator.serviceWorker.ready;
+          
+          this.permissionGranted = Notification.permission === 'granted';
+          
+          this.registration.addEventListener('updatefound', () => {
+            const newWorker = this.registration?.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('Service Worker updated');
+                }
+              });
+            }
+          });
+          
+        } catch (error) {
+          console.error('Service Worker registration failed:', error);
+        }
       }
+    } catch (error) {
+      console.error('Notification service initialization failed:', error);
     }
   }
 
   async requestPermission(): Promise<boolean> {
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        this.permissionGranted = true;
-        return true;
-      }
-      
-      if (Notification.permission === 'denied') {
-        return false;
-      }
-      
-      try {
-        const permission = await Notification.requestPermission();
-        this.permissionGranted = permission === 'granted';
-        return this.permissionGranted;
-      } catch (error) {
-        console.error('Error requesting notification permission:', error);
-        return false;
-      }
+    if (!('Notification' in window)) {
+      return false;
     }
-    return false;
+
+    if (Notification.permission === 'granted') {
+      this.permissionGranted = true;
+      return true;
+    }
+    
+    if (Notification.permission === 'denied') {
+      return false;
+    }
+    
+    try {
+      const permission = await Notification.requestPermission();
+      this.permissionGranted = permission === 'granted';
+      return this.permissionGranted;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
   }
 
   async showNotification(title: string, options?: any) {
