@@ -40,78 +40,84 @@ export const useRealtimeNotifications = ({ onNotificationReceived }: RealtimeNot
   const handleNewMessage = useCallback(async (payload: any) => {
     const message = payload.new;
     
-    // Don't notify for own messages
-    if (message.sender_id === user?.id) return;
+    // Don't notify for own messages or if user is not logged in
+    if (!user?.id || message.sender_id === user.id) return;
 
-    // Check if user is member of the group
-    const { data: membership } = await supabase
-      .from('chat_group_members')
-      .select('group_id')
-      .eq('group_id', message.group_id)
-      .eq('user_id', user?.id)
-      .single();
+    try {
+      // Check if user is member of the group
+      const { data: membership, error: membershipError } = await supabase
+        .from('chat_group_members')
+        .select('group_id')
+        .eq('group_id', message.group_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (!membership) return;
+      if (membershipError || !membership) return;
 
-    // Get sender info
-    const { data: sender } = await supabase
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('id', message.sender_id)
-      .single();
+      // Get sender info
+      const { data: sender } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', message.sender_id)
+        .maybeSingle();
 
-    const senderName = sender 
-      ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Someone'
-      : 'Someone';
+      const senderName = sender 
+        ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Someone'
+        : 'Someone';
 
-    // Show message notification
-    await notificationService.showMessageNotification(senderName, message.content);
+      // Show message notification
+      await notificationService.showMessageNotification(senderName, message.content);
 
-    // Create in-app notification
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: user?.id,
-        title: `💬 New message from ${senderName}`,
-        message: message.content.length > 50 
-          ? `${message.content.substring(0, 50)}...` 
-          : message.content,
-        type: 'message',
-        related_id: message.id,
-        related_type: 'message'
-      });
-
+      // Create in-app notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          title: `💬 New message from ${senderName}`,
+          message: message.content.length > 50 
+            ? `${message.content.substring(0, 50)}...` 
+            : message.content,
+          type: 'message',
+          related_id: message.id,
+          related_type: 'message'
+        });
+    } catch (error) {
+      console.error('Error handling new message notification:', error);
+    }
   }, [user?.id]);
 
   const handleNewEvent = useCallback(async (payload: any) => {
     const event = payload.new;
     
-    // Don't notify for own events
-    if (event.created_by === user?.id) return;
+    // Don't notify for own events or if user is not logged in
+    if (!user?.id || event.created_by === user.id) return;
 
-    const eventDate = new Date(event.start_date);
-    const formattedDate = eventDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    // Show event notification
-    await notificationService.showEventNotification(event.title, formattedDate);
-
-    // Create in-app notification
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: user?.id,
-        title: `📅 New event: ${event.title}`,
-        message: `Event scheduled for ${formattedDate}${event.location ? ` at ${event.location}` : ''}`,
-        type: 'event',
-        related_id: event.id,
-        related_type: 'event'
+    try {
+      const eventDate = new Date(event.start_date);
+      const formattedDate = eventDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
 
+      // Show event notification
+      await notificationService.showEventNotification(event.title, formattedDate);
+
+      // Create in-app notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          title: `📅 New event: ${event.title}`,
+          message: `Event scheduled for ${formattedDate}${event.location ? ` at ${event.location}` : ''}`,
+          type: 'event',
+          related_id: event.id,
+          related_type: 'event'
+        });
+    } catch (error) {
+      console.error('Error handling new event notification:', error);
+    }
   }, [user?.id]);
 
   useEffect(() => {

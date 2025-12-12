@@ -165,11 +165,13 @@ const EmployeeManagement = () => {
   };
 
   const filteredEmployees = employees.filter(emp => {
-    const nameMatch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
+    const nameMatch = fullName.includes(searchTerm.toLowerCase());
     const emailMatch = emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const positionMatch = emp.position?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
     const departmentMatch = selectedDepartment === 'all' || emp.department_id === selectedDepartment;
     
-    return (nameMatch || emailMatch) && departmentMatch;
+    return (nameMatch || emailMatch || positionMatch) && departmentMatch;
   });
 
   const handleDepartmentChange = (departmentId: string) => {
