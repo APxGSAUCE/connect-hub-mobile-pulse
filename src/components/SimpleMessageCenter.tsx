@@ -18,6 +18,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { PermissionBanner } from "@/components/PermissionBanner";
 import { MessageDeleteButton } from "@/components/MessageDeleteButton";
 import { CreateGroupDialog } from "@/components/CreateGroupDialog";
+import { messageSchema, chatGroupSchema } from "@/lib/validations";
 
 interface ChatGroup {
   id: string;
@@ -375,11 +376,23 @@ const SimpleMessageCenter = () => {
   const handleSendMessage = async () => {
     if (!user || !selectedGroup || !newMessage.trim()) return;
 
+    // Validate message content
+    const parseResult = messageSchema.safeParse({ content: newMessage });
+    if (!parseResult.success) {
+      toast({
+        title: "Validation Error",
+        description: parseResult.error.errors[0]?.message || "Invalid message",
+        variant: "destructive"
+      });
+      return;
+    }
+    const validatedContent = parseResult.data.content;
+
     try {
       const { error } = await supabase
         .from('messages')
         .insert({
-          content: newMessage.trim(),
+          content: validatedContent,
           group_id: selectedGroup.id,
           sender_id: user.id,
           message_type: 'text'
@@ -394,7 +407,7 @@ const SimpleMessageCenter = () => {
       // Show notification to other users
       await notificationService.showMessageNotification(
         user.email || 'Someone',
-        newMessage.trim()
+        validatedContent
       );
 
     } catch (error) {
@@ -420,12 +433,28 @@ const SimpleMessageCenter = () => {
       return;
     }
 
+    // Validate group data
+    const parseResult = chatGroupSchema.safeParse({
+      name: newGroupName,
+      description: newGroupDescription || null
+    });
+    if (!parseResult.success) {
+      toast({
+        title: "Validation Error",
+        description: parseResult.error.errors[0]?.message || "Invalid group data",
+        variant: "destructive"
+      });
+      return;
+    }
+    const validatedName = parseResult.data.name;
+    const validatedDescription = parseResult.data.description;
+
     try {
       const { data: groupData, error: groupError } = await supabase
         .from('chat_groups')
         .insert({
-          name: newGroupName.trim(),
-          description: newGroupDescription.trim() || null,
+          name: validatedName,
+          description: validatedDescription || null,
           group_type: 'group',
           created_by: user.id
         })

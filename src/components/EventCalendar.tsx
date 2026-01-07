@@ -16,6 +16,7 @@ import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useUserRole } from "@/hooks/useUserRole";
 import { PermissionBanner } from "@/components/PermissionBanner";
+import { eventSchema } from "@/lib/validations";
 
 interface Event {
   id: string;
@@ -139,14 +140,26 @@ const EventCalendar = () => {
       return;
     }
 
-    if (!newEvent.title || !newEvent.start_date || !newEvent.end_date) {
+    // Validate event data
+    const parseResult = eventSchema.safeParse({
+      title: newEvent.title,
+      description: newEvent.description || null,
+      location: newEvent.location || null,
+      start_date: newEvent.start_date,
+      end_date: newEvent.end_date,
+      event_type: newEvent.event_type,
+      image_url: newEvent.image_url || null
+    });
+    
+    if (!parseResult.success) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: "Validation Error",
+        description: parseResult.error.errors[0]?.message || "Invalid event data",
         variant: "destructive"
       });
       return;
     }
+    const validatedEvent = parseResult.data;
 
     if (new Date(newEvent.start_date) >= new Date(newEvent.end_date)) {
       toast({

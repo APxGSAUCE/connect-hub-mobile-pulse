@@ -9,6 +9,7 @@ import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { chatGroupSchema } from "@/lib/validations";
 
 interface Employee {
   id: string;
@@ -82,6 +83,22 @@ export const CreateGroupDialog = ({
       return;
     }
 
+    // Validate group data
+    const parseResult = chatGroupSchema.safeParse({
+      name: groupName,
+      description: groupDescription || null
+    });
+    if (!parseResult.success) {
+      toast({
+        title: "Validation Error",
+        description: parseResult.error.errors[0]?.message || "Invalid group data",
+        variant: "destructive"
+      });
+      return;
+    }
+    const validatedName = parseResult.data.name;
+    const validatedDescription = parseResult.data.description;
+
     if (selectedMembers.length === 0) {
       toast({
         title: "Error",
@@ -98,8 +115,8 @@ export const CreateGroupDialog = ({
       const { data: groupData, error: groupError } = await supabase
         .from('chat_groups')
         .insert({
-          name: groupName.trim(),
-          description: groupDescription.trim() || null,
+          name: validatedName,
+          description: validatedDescription || null,
           group_type: 'group',
           created_by: user.id
         })
