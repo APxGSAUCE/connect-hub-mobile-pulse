@@ -154,7 +154,7 @@ const EventCalendar = () => {
     if (!parseResult.success) {
       toast({
         title: "Validation Error",
-        description: parseResult.error.errors[0]?.message || "Invalid event data",
+        description: parseResult.error.issues[0]?.message || "Invalid event data",
         variant: "destructive"
       });
       return;

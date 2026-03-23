@@ -381,7 +381,7 @@ const SimpleMessageCenter = () => {
     if (!parseResult.success) {
       toast({
         title: "Validation Error",
-        description: parseResult.error.errors[0]?.message || "Invalid message",
+        description: parseResult.error.issues[0]?.message || "Invalid message",
         variant: "destructive"
       });
       return;
@@ -441,7 +441,7 @@ const SimpleMessageCenter = () => {
     if (!parseResult.success) {
       toast({
         title: "Validation Error",
-        description: parseResult.error.errors[0]?.message || "Invalid group data",
+        description: parseResult.error.issues[0]?.message || "Invalid group data",
         variant: "destructive"
       });
       return;
