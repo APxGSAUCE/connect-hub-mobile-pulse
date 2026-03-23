@@ -65,7 +65,7 @@ export function validateInput<T>(
 export function validateOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
   if (!result.success) {
-    throw new Error(result.error.errors[0]?.message || "Validation failed");
+    throw new Error(result.error.issues[0]?.message || "Validation failed");
   }
   return result.data;
 }
