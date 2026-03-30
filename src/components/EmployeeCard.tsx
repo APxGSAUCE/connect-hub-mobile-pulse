@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Mail, Phone } from "lucide-react";
 import { EmployeeActions } from "./EmployeeActions";
+import { useSignedUrl } from "@/hooks/useSignedUrl";
 
 interface Employee {
   id: string;
@@ -31,6 +32,8 @@ export const EmployeeCard = ({
   onDirectMessage, 
   onStatusUpdate 
 }: EmployeeCardProps) => {
+  const resolvedAvatarUrl = useSignedUrl(employee.avatar_url);
+
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
@@ -41,7 +44,7 @@ export const EmployeeCard = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Avatar className="w-12 h-12">
-              {employee.avatar_url && <AvatarImage src={employee.avatar_url} alt="Profile" />}
+              {resolvedAvatarUrl && <AvatarImage src={resolvedAvatarUrl} alt="Profile" />}
               <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
                 {getInitials(employee.first_name, employee.last_name)}
               </AvatarFallback>
