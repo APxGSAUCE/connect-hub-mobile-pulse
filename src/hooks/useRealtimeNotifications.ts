@@ -129,12 +129,6 @@ export const useRealtimeNotifications = ({ onNotificationReceived }: RealtimeNot
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, handleNewNotification)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
         table: 'messages'
       }, handleNewMessage)
       .on('postgres_changes', {
