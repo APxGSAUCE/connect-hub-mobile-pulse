@@ -737,13 +737,13 @@ const EventCalendar = () => {
             return (
               <Card key={event.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2 sm:pb-3">
-                  {event.image_url && (
+                  {resolvedImageUrls[event.id] && (
                     <div className="mb-3">
                        <img 
-                         src={event.image_url} 
+                         src={resolvedImageUrls[event.id]} 
                          alt={event.title}
                          className="w-full h-64 sm:h-80 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                         onClick={() => window.open(event.image_url, '_blank')}
+                         onClick={() => window.open(resolvedImageUrls[event.id], '_blank')}
                          onError={(e) => {
                            const target = e.target as HTMLImageElement;
                            target.style.display = 'none';
