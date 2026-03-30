@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { getSignedFileUrl } from "@/lib/storageUtils";
 import { PermissionMatrix } from "@/components/PermissionBanner";
 
 interface Department {
@@ -37,6 +38,7 @@ const ProfileMenu = () => {
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(null);
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -137,6 +139,15 @@ const ProfileMenu = () => {
     }
   };
 
+  // Resolve avatar signed URL whenever avatar_url changes
+  useEffect(() => {
+    if (profileData.avatar_url) {
+      getSignedFileUrl(profileData.avatar_url).then(setResolvedAvatarUrl);
+    } else {
+      setResolvedAvatarUrl(null);
+    }
+  }, [profileData.avatar_url]);
+
   useEffect(() => {
     if (user) {
       fetchProfile();
@@ -172,15 +183,13 @@ const ProfileMenu = () => {
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('files')
-        .getPublicUrl(`avatars/${fileName}`);
+      // Store only the file path (not a full URL)
+      const storedPath = `avatars/${fileName}`;
 
-      // Update profile with new avatar URL
+      // Update profile with the file path
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: storedPath })
         .eq('id', user.id);
 
       if (updateError) {
@@ -188,7 +197,10 @@ const ProfileMenu = () => {
         throw updateError;
       }
 
-      setProfileData(prev => ({ ...prev, avatar_url: publicUrl }));
+      // Generate a signed URL for immediate display
+      const signedUrl = await getSignedFileUrl(storedPath);
+      setProfileData(prev => ({ ...prev, avatar_url: storedPath }));
+      setResolvedAvatarUrl(signedUrl);
 
       toast({
         title: "Success",
@@ -271,8 +283,8 @@ const ProfileMenu = () => {
         <div className="flex items-center space-x-4 p-4">
           <div className="relative">
             <Avatar className="w-12 h-12">
-              {profileData.avatar_url ? (
-                <AvatarImage src={profileData.avatar_url} alt="Profile picture" />
+              {resolvedAvatarUrl ? (
+                <AvatarImage src={resolvedAvatarUrl} alt="Profile picture" />
               ) : null}
               <AvatarFallback className="bg-blue-600 text-white">
                 {getInitials(profileData.first_name, profileData.last_name)}
