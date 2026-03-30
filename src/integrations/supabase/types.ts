@@ -106,6 +106,13 @@ export type Database = {
             foreignKeyName: "departments_head_user_id_fkey"
             columns: ["head_user_id"]
             isOneToOne: false
+            referencedRelation: "department_colleagues_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "departments_head_user_id_fkey"
+            columns: ["head_user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -404,7 +411,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      department_colleagues_view: {
+        Row: {
+          avatar_url: string | null
+          department_id: string | null
+          first_name: string | null
+          id: string | null
+          last_name: string | null
+          position: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          department_id?: string | null
+          first_name?: string | null
+          id?: string | null
+          last_name?: string | null
+          position?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          department_id?: string | null
+          first_name?: string | null
+          id?: string | null
+          last_name?: string | null
+          position?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_delete_message: {
