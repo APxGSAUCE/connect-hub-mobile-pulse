@@ -78,23 +78,15 @@ class RealtimeService {
         break;
 
       case 'profiles':
-        channel = supabase
-          .channel(uniqueId)
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'profiles'
-          }, () => this.notifySubscribers(channelName));
+        // Profiles removed from Realtime publication for security.
+        // Use polling or manual refetch instead.
+        channel = supabase.channel(uniqueId);
         break;
 
       case 'notifications':
-        channel = supabase
-          .channel(uniqueId)
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'notifications'
-          }, () => this.notifySubscribers(channelName));
+        // Notifications removed from Realtime publication for security.
+        // Use polling or manual refetch instead.
+        channel = supabase.channel(uniqueId);
         break;
 
       case 'departments':
