@@ -63,6 +63,7 @@ const EventCalendar = () => {
   const [employees, setEmployees] = useState<Profile[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
 
   const fetchEvents = async () => {
     if (!user) return;
@@ -82,6 +83,18 @@ const EventCalendar = () => {
 
       console.log('Fetched events data:', eventsData);
       setEvents(eventsData || []);
+
+      // Resolve signed URLs for event images
+      const urlMap: Record<string, string> = {};
+      await Promise.all(
+        (eventsData || [])
+          .filter(e => e.image_url)
+          .map(async (e) => {
+            const signedUrl = await getSignedFileUrl(e.image_url!);
+            if (signedUrl) urlMap[e.id] = signedUrl;
+          })
+      );
+      setResolvedImageUrls(urlMap);
 
     } catch (error) {
       console.error('Error fetching events:', error);
