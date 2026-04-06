@@ -292,7 +292,7 @@ const Index = () => {
   }
 
   if (!user) {
-    window.location.href = '/auth';
+    navigate('/auth', { replace: true });
     return null;
   }
 
