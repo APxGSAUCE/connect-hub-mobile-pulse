@@ -6,6 +6,8 @@ class RealtimeService {
   private channels: Map<string, RealtimeChannel> = new Map();
   private subscribers: Map<string, Set<() => void>> = new Map();
   private channelStatus: Map<string, 'connecting' | 'connected' | 'disconnected' | 'error'> = new Map();
+  private pollTimers: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private pollIntervalMs = 30000;
   private retryCount: Map<string, number> = new Map();
   private maxRetries = 3;
 
@@ -78,15 +80,11 @@ class RealtimeService {
         break;
 
       case 'profiles':
-        // Profiles removed from Realtime publication for security.
-        // Use polling or manual refetch instead.
-        channel = supabase.channel(uniqueId);
-        break;
-
       case 'notifications':
-        // Notifications removed from Realtime publication for security.
-        // Use polling or manual refetch instead.
+        // These tables are excluded from the Realtime publication for security,
+        // so refresh them on an interval instead.
         channel = supabase.channel(uniqueId);
+        this.startPolling(channelName);
         break;
 
       case 'departments':
