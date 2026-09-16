@@ -378,6 +378,60 @@ export type Database = {
           },
         ]
       }
+      role_change_requests: {
+        Row: {
+          created_at: string
+          desired_role: Database["public"]["Enums"]["app_role"]
+          id: string
+          previous_role: Database["public"]["Enums"]["app_role"]
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          desired_role: Database["public"]["Enums"]["app_role"]
+          id?: string
+          previous_role: Database["public"]["Enums"]["app_role"]
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          desired_role?: Database["public"]["Enums"]["app_role"]
+          id?: string
+          previous_role?: Database["public"]["Enums"]["app_role"]
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_change_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -504,6 +558,14 @@ export type Database = {
       request_access_approval: {
         Args: { request_notes?: string }
         Returns: undefined
+      }
+      review_role_change_request: {
+        Args: { _approve: boolean; _request_id: string; _review_notes?: string }
+        Returns: undefined
+      }
+      submit_role_change_request: {
+        Args: { _requested_role: Database["public"]["Enums"]["app_role"] }
+        Returns: string
       }
     }
     Enums: {

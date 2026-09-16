@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,6 @@ interface RecentEvent {
 
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [userRole, setUserRole] = useState<string>('');
@@ -292,8 +291,7 @@ const Index = () => {
   }
 
   if (!user) {
-    navigate('/auth', { replace: true });
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   return (

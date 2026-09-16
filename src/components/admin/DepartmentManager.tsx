@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Building2, Loader2, Plus, Save, Users } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -143,17 +144,35 @@ export const DepartmentManager: React.FC = () => {
       </Card>
 
       <div className="space-y-4">
-        {departments.map((dept) => (
-          <DepartmentRow
-            key={dept.id}
-            dept={dept}
-            profiles={profiles}
-            members={memberCount(dept.id)}
-            saving={savingId === dept.id}
-            onSave={updateDepartment}
-            fullName={fullName}
-          />
-        ))}
+        <Accordion type="single" collapsible className="space-y-2 md:hidden">
+          {departments.map((dept) => (
+            <AccordionItem key={dept.id} value={dept.id} className="rounded-md border px-3">
+              <AccordionTrigger className="gap-2 py-3 hover:no-underline">
+                <span className="flex min-w-0 items-center gap-2 text-left">
+                  <Building2 className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate">{dept.name}</span>
+                  <Badge variant="secondary">{memberCount(dept.id)}</Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <DepartmentFields dept={dept} profiles={profiles} saving={savingId === dept.id} onSave={updateDepartment} fullName={fullName} />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+        <div className="hidden space-y-4 md:block">
+          {departments.map((dept) => (
+            <DepartmentRow
+              key={dept.id}
+              dept={dept}
+              profiles={profiles}
+              members={memberCount(dept.id)}
+              saving={savingId === dept.id}
+              onSave={updateDepartment}
+              fullName={fullName}
+            />
+          ))}
+        </div>
         {departments.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -176,6 +195,20 @@ interface RowProps {
 }
 
 const DepartmentRow: React.FC<RowProps> = ({ dept, profiles, members, saving, onSave, fullName }) => {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-primary" />{dept.name}</CardTitle>
+          <Badge variant="secondary" className="gap-1"><Users className="h-3 w-3" />{members} {members === 1 ? 'employee' : 'employees'}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent><DepartmentFields dept={dept} profiles={profiles} saving={saving} onSave={onSave} fullName={fullName} /></CardContent>
+    </Card>
+  );
+};
+
+const DepartmentFields: React.FC<Omit<RowProps, 'members'>> = ({ dept, profiles, saving, onSave, fullName }) => {
   const [name, setName] = useState(dept.name);
   const [description, setDescription] = useState(dept.description || '');
   const [head, setHead] = useState(dept.head_user_id || NO_HEAD);
@@ -186,20 +219,7 @@ const DepartmentRow: React.FC<RowProps> = ({ dept, profiles, members, saving, on
     head !== (dept.head_user_id || NO_HEAD);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-4 w-4 text-primary" />
-            {dept.name}
-          </CardTitle>
-          <Badge variant="secondary" className="gap-1">
-            <Users className="h-3 w-3" />
-            {members} {members === 1 ? 'employee' : 'employees'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label>Name</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
@@ -245,8 +265,7 @@ const DepartmentRow: React.FC<RowProps> = ({ dept, profiles, members, saving, on
             Save changes
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
   );
 };
 
