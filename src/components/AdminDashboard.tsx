@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Users, UserCheck, UserX, Clock, Shield, Building2, LayoutDashboard, Loader2, RefreshCw, MailPlus,
+  Users, UserCheck, UserX, Clock, Shield, Building2, LayoutDashboard, Loader2, RefreshCw, MailPlus, Settings,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -12,8 +12,13 @@ import { ApprovalCenter } from '@/components/ApprovalCenter';
 import { DepartmentManager } from '@/components/admin/DepartmentManager';
 import { UserAdminTable, AdminUser } from '@/components/admin/UserAdminTable';
 import { InviteEmployee } from '@/components/admin/InviteEmployee';
+import { AdminAccountSettings } from '@/components/admin/AdminAccountSettings';
+import { RoleChangeRequests } from '@/components/admin/RoleChangeRequests';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Database } from '@/integrations/supabase/types';
 
-type Section = 'overview' | 'users' | 'departments' | 'approvals' | 'invite';
+type AppRole = Database['public']['Enums']['app_role'];
+type Section = 'overview' | 'invite' | 'users' | 'departments' | 'approvals' | 'settings';
 
 const navItems: { key: Section; label: string; icon: React.ElementType; description: string }[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard, description: 'Key numbers at a glance' },
@@ -21,6 +26,7 @@ const navItems: { key: Section; label: string; icon: React.ElementType; descript
   { key: 'users', label: 'Roles & Status', icon: Users, description: 'Roles and approval status' },
   { key: 'departments', label: 'Departments', icon: Building2, description: 'Departments and heads' },
   { key: 'approvals', label: 'Approvals', icon: Clock, description: 'Review new requests' },
+  { key: 'settings', label: 'My Settings', icon: Settings, description: 'Password, role and department' },
 ];
 
 export const AdminDashboard = () => {
@@ -29,7 +35,7 @@ export const AdminDashboard = () => {
   const [section, setSection] = useState<Section>('overview');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [departmentCount, setDepartmentCount] = useState(0);
-  const [userRole, setUserRole] = useState<string>('');
+  const [userRole, setUserRole] = useState<AppRole>('employee');
   const [loading, setLoading] = useState(true);
 
   const fetchAll = async () => {
@@ -100,7 +106,7 @@ export const AdminDashboard = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">Admin Dashboard</h1>
           <p className="text-sm text-muted-foreground">
@@ -119,18 +125,31 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Sidebar */}
-        <nav className="flex gap-2 overflow-x-auto rounded-lg border bg-card p-2 lg:w-64 lg:flex-col lg:overflow-visible">
+      <div className="md:hidden">
+        <Select value={section} onValueChange={(value: Section) => setSection(value)}>
+          <SelectTrigger aria-label="Admin dashboard section" className="h-12">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {navItems.map((item) => (
+              <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-5">
+        <nav className="hidden w-60 shrink-0 flex-col gap-1 border-r pr-4 md:flex">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = section === item.key;
             return (
-              <button
+              <Button
                 key={item.key}
                 type="button"
+                variant="ghost"
                 onClick={() => setSection(item.key)}
-                className={`flex flex-shrink-0 items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors lg:w-full ${
+                className={`h-auto w-full justify-start gap-3 px-3 py-2 text-left ${
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -143,7 +162,7 @@ export const AdminDashboard = () => {
                     {stats.pending}
                   </span>
                 )}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -152,7 +171,7 @@ export const AdminDashboard = () => {
         <div className="min-w-0 flex-1 space-y-4">
           {section === 'overview' && (
             <>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
                 <StatCard label="Total employees" value={stats.total} icon={Users} />
                 <StatCard label="Pending approvals" value={stats.pending} icon={Clock} />
                 <StatCard label="Approved" value={stats.approved} icon={UserCheck} />
@@ -170,15 +189,15 @@ export const AdminDashboard = () => {
                   {navItems
                     .filter((i) => i.key !== 'overview')
                     .map((item) => (
-                      <button
+                      <Button
                         key={item.key}
                         type="button"
+                        variant="outline"
                         onClick={() => setSection(item.key)}
-                        className="rounded-lg border p-3 text-left transition-colors hover:bg-muted"
+                        className="h-auto min-w-0 justify-start whitespace-normal p-3 text-left"
                       >
-                        <p className="text-sm font-medium">{item.label}</p>
-                        <p className="text-xs text-muted-foreground">{item.description}</p>
-                      </button>
+                        <span className="min-w-0"><span className="block text-sm font-medium">{item.label}</span><span className="block text-xs font-normal text-muted-foreground">{item.description}</span></span>
+                      </Button>
                     ))}
                 </CardContent>
               </Card>
@@ -200,7 +219,14 @@ export const AdminDashboard = () => {
 
           {section === 'departments' && <DepartmentManager />}
 
-          {section === 'approvals' && <ApprovalCenter />}
+          {section === 'approvals' && (
+            <div className="space-y-4">
+              <ApprovalCenter />
+              <RoleChangeRequests enabled={userRole === 'super_admin'} onChanged={fetchAll} />
+            </div>
+          )}
+
+          {section === 'settings' && <AdminAccountSettings currentRole={userRole} onChanged={fetchAll} />}
         </div>
       </div>
     </div>
@@ -212,11 +238,11 @@ const StatCard: React.FC<{ label: string; value: number; icon: React.ElementType
   value,
   icon: Icon,
 }) => (
-  <Card className="transition-shadow hover:shadow-md">
-    <CardContent className="flex items-center justify-between p-4">
+  <Card>
+    <CardContent className="flex min-h-24 items-center justify-between p-3 sm:p-4">
       <div className="min-w-0">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xl font-bold sm:text-2xl">{value}</p>
       </div>
       <div className="ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
         <Icon className="h-4 w-4 text-primary" />
