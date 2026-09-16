@@ -184,6 +184,8 @@ class RealtimeService {
   }
 
   cleanup() {
+    this.pollTimers.forEach((timer) => clearInterval(timer));
+    this.pollTimers.clear();
     this.channels.forEach((channel, name) => {
       supabase.removeChannel(channel);
       console.log(`Cleaned up channel ${name}`);

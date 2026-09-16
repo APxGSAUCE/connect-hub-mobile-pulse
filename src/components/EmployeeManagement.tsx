@@ -60,9 +60,17 @@ const EmployeeManagement = () => {
 
       if (error) throw error;
       
-      const typedEmployees = (data || []).map(emp => ({
-        ...emp,
-        status: emp.status as 'active' | 'muted' | 'blocked' | 'inactive'
+      // Non-admin views return a limited column set, so fill in safe defaults
+      const typedEmployees: Employee[] = (data || []).map((emp: any) => ({
+        id: emp.id,
+        first_name: emp.first_name ?? '',
+        last_name: emp.last_name ?? '',
+        email: emp.email ?? '',
+        phone: emp.phone ?? null,
+        position: emp.position ?? null,
+        department_id: emp.department_id ?? null,
+        avatar_url: emp.avatar_url ?? null,
+        status: (emp.status ?? 'active') as Employee['status'],
       }));
 
       setEmployees(typedEmployees);
