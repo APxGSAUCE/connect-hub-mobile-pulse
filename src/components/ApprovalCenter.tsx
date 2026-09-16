@@ -67,15 +67,11 @@ export const ApprovalCenter = () => {
 
   const handleApprove = async (requestId: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          approval_status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by: user?.id,
-          approval_notes: approvalNotes.trim() || null
-        })
-        .eq('id', requestId);
+      const { error } = await supabase.rpc('review_access_request', {
+        _profile_id: requestId,
+        _approve: true,
+        _notes: approvalNotes.trim() || null,
+      });
 
       if (error) throw error;
 
@@ -108,13 +104,11 @@ export const ApprovalCenter = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          approval_status: 'rejected',
-          rejected_reason: rejectionReason.trim()
-        })
-        .eq('id', requestId);
+      const { error } = await supabase.rpc('review_access_request', {
+        _profile_id: requestId,
+        _approve: false,
+        _notes: rejectionReason.trim(),
+      });
 
       if (error) throw error;
 
