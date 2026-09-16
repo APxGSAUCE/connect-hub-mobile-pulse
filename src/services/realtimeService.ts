@@ -152,7 +152,25 @@ class RealtimeService {
     }
   }
 
+  private startPolling(channelName: string) {
+    if (this.pollTimers.has(channelName)) return;
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      this.notifySubscribers(channelName);
+    }, this.pollIntervalMs);
+    this.pollTimers.set(channelName, timer);
+  }
+
+  private stopPolling(channelName: string) {
+    const timer = this.pollTimers.get(channelName);
+    if (timer) {
+      clearInterval(timer);
+      this.pollTimers.delete(channelName);
+    }
+  }
+
   private removeChannel(channelName: string) {
+    this.stopPolling(channelName);
     const channel = this.channels.get(channelName);
     if (channel) {
       supabase.removeChannel(channel);
