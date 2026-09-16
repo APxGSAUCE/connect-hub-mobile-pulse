@@ -525,6 +525,14 @@ export type Database = {
           rejected_reason: string
         }[]
       }
+      get_signup_departments: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          name: string
+        }[]
+      }
       get_unread_message_count: {
         Args: { user_id_param: string }
         Returns: number
