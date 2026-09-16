@@ -2,37 +2,42 @@
 // approve themselves or change their own role.
 //
 // Run with the supabase test_edge_functions tool (Deno test runner).
+// Uses the publishable (anon) key only, so it runs anywhere. If
+// SUPABASE_SERVICE_ROLE_KEY happens to be available the temporary test
+// account is deleted afterwards; otherwise the account stays as a
+// clearly-named "regression+..." record for manual cleanup.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://lfhfmsguftzlzurunxzg.supabase.co";
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmaGZtc2d1ZnR6bHp1cnVueHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEyNjEyMjIsImV4cCI6MjA2NjgzNzIyMn0.yHMSUht8I8JJKxEZxx7X68cs-wLHlzC5JmUBdIrsGvU";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-
-Deno.test("access request flow: submit allowed, self-approval and role change blocked", async () => {
+Deno.test("access request: submit allowed, self-approval and role change blocked", async () => {
   const email = `regression+${crypto.randomUUID()}@example.com`;
   const password = `Regr3ssion!${crypto.randomUUID().slice(0, 8)}`;
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
+  const client = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: signUp, error: signUpError } = await client.auth.signUp({
     email,
     password,
-    email_confirm: true,
-    user_metadata: { first_name: "Regression", last_name: "Test" },
+    options: { data: { first_name: "Regression", last_name: "Test" } },
   });
-  assertEquals(createError, null);
-  const userId = created!.user!.id;
+  assertEquals(signUpError, null, `sign up failed: ${signUpError?.message}`);
+
+  const userId = signUp.user?.id;
+  assert(userId, "expected a new user id");
+
+  if (!signUp.session) {
+    const { error: signInError } = await client.auth.signInWithPassword({ email, password });
+    assertEquals(signInError, null, `sign in failed: ${signInError?.message}`);
+  }
 
   try {
-    const client = createClient(SUPABASE_URL, ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { error: signInError } = await client.auth.signInWithPassword({ email, password });
-    assertEquals(signInError, null);
-
     // 1. Submitting an access request must succeed and set the status to pending.
     const { error: rpcError } = await client.rpc("request_access_approval", {
       request_notes: "Automated regression test request",
@@ -41,7 +46,7 @@ Deno.test("access request flow: submit allowed, self-approval and role change bl
 
     const { data: profile } = await client
       .from("profiles")
-      .select("approval_status, approval_notes, approved_by, approved_at")
+      .select("approval_status, approved_by, approved_at")
       .eq("id", userId)
       .maybeSingle();
     assertEquals(profile?.approval_status, "pending");
@@ -92,9 +97,13 @@ Deno.test("access request flow: submit allowed, self-approval and role change bl
       .eq("id", userId)
       .maybeSingle();
     assertEquals(after?.approval_status, "pending");
-
-    await client.auth.signOut();
   } finally {
-    await admin.auth.admin.deleteUser(userId);
+    await client.auth.signOut();
+    if (SERVICE_KEY) {
+      const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      await admin.auth.admin.deleteUser(userId!);
+    }
   }
 });
