@@ -501,6 +501,10 @@ export type Database = {
         Args: { message_id_param: string; user_id_param: string }
         Returns: undefined
       }
+      request_access_approval: {
+        Args: { request_notes?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "employee" | "dept_head" | "admin" | "super_admin"

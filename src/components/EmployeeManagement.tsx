@@ -8,6 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmployeeFilters } from "./EmployeeFilters";
 import { EmployeeList } from "./EmployeeList";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApprovalCenter } from "@/components/ApprovalCenter";
+import { AccessRequestCard } from "@/components/AccessRequestCard";
 
 interface Employee {
   id: string;
@@ -197,6 +200,27 @@ const EmployeeManagement = () => {
     );
   }
 
+  const canReviewApprovals = (userRole?.can_manage_users || userRole?.is_department_head) ?? false;
+
+  const directory = (
+    <>
+      <EmployeeFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedDepartment={selectedDepartment}
+        onDepartmentChange={handleDepartmentChange}
+        departments={departments}
+      />
+
+      <EmployeeList
+        employees={filteredEmployees}
+        isAdmin={userRole?.can_manage_users || false}
+        onDirectMessage={startDirectMessage}
+        onStatusUpdate={updateEmployeeStatus}
+      />
+    </>
+  );
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
@@ -207,22 +231,25 @@ const EmployeeManagement = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <EmployeeFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        selectedDepartment={selectedDepartment}
-        onDepartmentChange={handleDepartmentChange}
-        departments={departments}
-      />
+      {/* Access request status for employees awaiting approval */}
+      <AccessRequestCard onSubmitted={fetchEmployees} />
 
-      {/* Employee List */}
-      <EmployeeList
-        employees={filteredEmployees}
-        isAdmin={userRole?.can_manage_users || false}
-        onDirectMessage={startDirectMessage}
-        onStatusUpdate={updateEmployeeStatus}
-      />
+      {canReviewApprovals ? (
+        <Tabs defaultValue="directory" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="directory">Directory</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          </TabsList>
+          <TabsContent value="directory" className="space-y-6">
+            {directory}
+          </TabsContent>
+          <TabsContent value="approvals">
+            <ApprovalCenter />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        directory
+      )}
     </div>
   );
 };
