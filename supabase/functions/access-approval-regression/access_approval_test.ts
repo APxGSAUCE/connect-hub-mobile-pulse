@@ -15,7 +15,7 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ??
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 Deno.test("access request: submit allowed, self-approval and role change blocked", async () => {
-  const email = `qa-${crypto.randomUUID()}@regression-test.dev`;
+  const email = `qa-${crypto.randomUUID()}@mailinator.com`;
   const password = `Regr3ssion!${crypto.randomUUID().slice(0, 8)}`;
 
   const client = createClient(SUPABASE_URL, ANON_KEY, {
