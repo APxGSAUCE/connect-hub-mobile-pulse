@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Users, UserCheck, UserX, Clock, Shield, Building2, LayoutDashboard, Loader2, RefreshCw,
+  Users, UserCheck, UserX, Clock, Shield, Building2, LayoutDashboard, Loader2, RefreshCw, MailPlus,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,11 +11,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ApprovalCenter } from '@/components/ApprovalCenter';
 import { DepartmentManager } from '@/components/admin/DepartmentManager';
 import { UserAdminTable, AdminUser } from '@/components/admin/UserAdminTable';
+import { InviteEmployee } from '@/components/admin/InviteEmployee';
 
-type Section = 'overview' | 'users' | 'departments' | 'approvals';
+type Section = 'overview' | 'users' | 'departments' | 'approvals' | 'invite';
 
 const navItems: { key: Section; label: string; icon: React.ElementType; description: string }[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard, description: 'Key numbers at a glance' },
+  { key: 'invite', label: 'Invite Employee', icon: MailPlus, description: 'Add a new person to the portal' },
   { key: 'users', label: 'Roles & Status', icon: Users, description: 'Roles and approval status' },
   { key: 'departments', label: 'Departments', icon: Building2, description: 'Departments and heads' },
   { key: 'approvals', label: 'Approvals', icon: Clock, description: 'Review new requests' },
