@@ -151,11 +151,12 @@ export const AccessRequestCard = ({ onSubmitted }: AccessRequestCardProps) => {
           </>
         )}
 
-        {status === null && (
-          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <CheckCircle className="w-3 h-3" /> Requests are reviewed by admins and department heads.
-          </p>
-        )}
+        <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          <CheckCircle className="w-3 h-3" /> Requests are reviewed by admins and department heads.
+          <Link to="/access-status" className="underline underline-offset-2 hover:text-foreground">
+            View request status
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );
