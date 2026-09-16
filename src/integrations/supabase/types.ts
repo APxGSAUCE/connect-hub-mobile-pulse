@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_request_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          notes: string | null
+          outcome: string
+          profile_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notes?: string | null
+          outcome?: string
+          profile_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notes?: string | null
+          outcome?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_request_audit_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_group_members: {
         Row: {
           group_id: string
@@ -565,6 +606,10 @@ export type Database = {
       }
       request_access_approval: {
         Args: { request_notes?: string }
+        Returns: undefined
+      }
+      review_access_request: {
+        Args: { _approve: boolean; _notes?: string; _profile_id: string }
         Returns: undefined
       }
       review_role_change_request: {
