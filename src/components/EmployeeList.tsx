@@ -11,6 +11,7 @@ interface Employee {
   position: string | null;
   status: 'active' | 'muted' | 'blocked' | 'inactive';
   department_id: string | null;
+  avatar_url?: string | null;
 }
 
 interface EmployeeListProps {
