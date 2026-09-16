@@ -104,13 +104,11 @@ export const ApprovalCenter = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          approval_status: 'rejected',
-          rejected_reason: rejectionReason.trim()
-        })
-        .eq('id', requestId);
+      const { error } = await supabase.rpc('review_access_request', {
+        _profile_id: requestId,
+        _approve: false,
+        _notes: rejectionReason.trim(),
+      });
 
       if (error) throw error;
 
