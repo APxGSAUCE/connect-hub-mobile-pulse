@@ -486,6 +486,17 @@ const Auth = () => {
             </div>
           )}
 
+          <div className="mt-2 text-center">
+            <button
+              type="button"
+              onClick={() => navigate("/password-policy")}
+              className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+              disabled={loading}
+            >
+              Password policy
+            </button>
+          </div>
+
           <div className="mt-6 text-center">
             <button
               type="button"

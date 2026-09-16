@@ -1,473 +1,222 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Users, UserCheck, UserX, AlertCircle, 
-  Clock, CheckCircle, Shield, Settings 
+import { Button } from '@/components/ui/button';
+import {
+  Users, UserCheck, UserX, Clock, Shield, Building2, LayoutDashboard, Loader2, RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { ApprovalCenter } from '@/components/ApprovalCenter';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DepartmentManager } from '@/components/admin/DepartmentManager';
+import { UserAdminTable, AdminUser } from '@/components/admin/UserAdminTable';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  status: string;
-  department_id: string;
-  employee_id: string;
-  phone: string;
-  position: string;
-  created_at: string;
-}
+type Section = 'overview' | 'users' | 'departments' | 'approvals';
 
-interface VerificationRequest {
-  id: string;
-  user_id: string;
-  documents: any;
-  status: string;
-  admin_notes: string;
-  created_at: string;
-  profiles: UserProfile;
-}
+const navItems: { key: Section; label: string; icon: React.ElementType; description: string }[] = [
+  { key: 'overview', label: 'Overview', icon: LayoutDashboard, description: 'Key numbers at a glance' },
+  { key: 'users', label: 'Roles & Status', icon: Users, description: 'Roles and approval status' },
+  { key: 'departments', label: 'Departments', icon: Building2, description: 'Departments and heads' },
+  { key: 'approvals', label: 'Approvals', icon: Clock, description: 'Review new requests' },
+];
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [pendingVerifications, setPendingVerifications] = useState<VerificationRequest[]>([]);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [section, setSection] = useState<Section>('overview');
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [departmentCount, setDepartmentCount] = useState(0);
   const [userRole, setUserRole] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserRole();
-      fetchPendingVerifications();
-      fetchAllUsers();
-    }
-  }, [user]);
-
-  const fetchUserRole = async () => {
-    try {
-      // Fetch role from user_roles table
-      const { data, error } = await supabase
+  const fetchAll = async () => {
+    setLoading(true);
+    const [roleRes, profileRes, deptRes] = await Promise.all([
+      supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user?.id)
+        .eq('user_id', user?.id ?? '')
         .order('role', { ascending: false })
         .limit(1)
-        .maybeSingle();
-      
-      if (error) throw error;
-      setUserRole(data?.role || 'employee');
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-      setUserRole('employee');
-    }
-  };
-
-  const fetchPendingVerifications = async () => {
-    try {
-      // Since user_verifications table might not be in types yet, we'll use a simpler approach
-      // For now, we'll just fetch users with PENDING_VERIFICATION status
-      const { data, error } = await supabase
+        .maybeSingle(),
+      supabase
         .from('profiles')
-        .select('*')
-        .eq('status', 'PENDING_VERIFICATION')
-        .order('created_at', { ascending: false });
+        .select('id, email, first_name, last_name, role, status, approval_status, department_id, position')
+        .order('created_at', { ascending: false }),
+      supabase.from('departments').select('id', { count: 'exact', head: true }),
+    ]);
 
-      if (error) throw error;
-      
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(profile => ({
-        id: profile.id,
-        user_id: profile.id,
-        documents: profile.verification_documents,
-        status: 'PENDING_VERIFICATION',
-        admin_notes: '',
-        created_at: profile.created_at,
-        profiles: profile
-      }));
-      
-      setPendingVerifications(transformedData);
-    } catch (error) {
-      console.error('Error fetching pending verifications:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load pending verifications.",
-        variant: "destructive"
-      });
+    setUserRole(roleRes.data?.role || 'employee');
+
+    if (profileRes.error) {
+      toast({ title: 'Error', description: 'Could not load employees.', variant: 'destructive' });
+    } else {
+      setUsers((profileRes.data || []) as AdminUser[]);
     }
+    setDepartmentCount(deptRes.count ?? 0);
+    setLoading(false);
   };
 
-  const fetchAllUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+  useEffect(() => {
+    if (user) fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-      if (error) throw error;
-      setAllUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stats = useMemo(() => {
+    const pending = users.filter((u) => (u.approval_status || 'pending') === 'pending').length;
+    const approved = users.filter((u) => u.approval_status === 'approved').length;
+    const rejected = users.filter((u) => u.approval_status === 'rejected').length;
+    const admins = users.filter((u) => u.role === 'admin' || u.role === 'super_admin').length;
+    const deptHeads = users.filter((u) => u.role === 'dept_head').length;
+    return { pending, approved, rejected, admins, deptHeads, total: users.length };
+  }, [users]);
 
-  const handleVerificationAction = async (
-    verificationId: string, 
-    userId: string, 
-    action: 'approve' | 'reject',
-    adminNotes?: string
-  ) => {
-    try {
-      setLoading(true);
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-      // Update user profile status directly
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          status: action === 'approve' ? 'APPROVED' : 'REJECTED',
-          approved_by: user?.id,
-          approved_at: action === 'approve' ? new Date().toISOString() : null
-        })
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
-
-      toast({
-        title: "Success",
-        description: `User ${action === 'approve' ? 'approved' : 'rejected'} successfully.`,
-      });
-
-      // Refresh data
-      fetchPendingVerifications();
-      fetchAllUsers();
-    } catch (error) {
-      console.error(`Error ${action}ing user:`, error);
-      toast({
-        title: "Error",
-        description: `Failed to ${action} user.`,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateUserRole = async (userId: string, newRole: string) => {
-    try {
-      console.log('Attempting to update user role:', { userId, newRole, currentUser: user?.id });
-      
-      // Check if user session is still valid
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        console.error('Session error:', sessionError);
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page and try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Update role in both places for backwards compatibility
-      // The trigger will sync from profiles to user_roles
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-        throw profileError;
-      }
-
-      // The sync trigger will handle updating user_roles automatically
-      toast({
-        title: "Success",
-        description: "User role updated successfully.",
-      });
-
-      fetchAllUsers();
-      fetchUserRole();
-    } catch (error: any) {
-      console.error('Error updating user role:', error);
-      toast({
-        title: "Error",
-        description: `Failed to update user role: ${error?.message || 'Unknown error'}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'bg-red-100 text-red-800';
-      case 'admin': return 'bg-blue-100 text-blue-800';
-      case 'dept_head': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'APPROVED': return 'bg-green-100 text-green-800';
-      case 'PENDING_VERIFICATION': return 'bg-yellow-100 text-yellow-800';
-      case 'REJECTED': return 'bg-red-100 text-red-800';
-      case 'SUSPENDED': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (userRole !== 'super_admin' && userRole !== 'admin') {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
-          <p className="text-gray-600">You don't have permission to access this admin dashboard.</p>
-        </div>
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (loading) {
+  if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center">
+          <Shield className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-medium">Access denied</h3>
+          <p className="text-sm text-muted-foreground">
+            You don't have permission to open the admin dashboard.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 sm:space-y-6">
-      {/* Header - Mobile optimized */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-sm text-gray-600">Manage users and verification requests</p>
-          </div>
-          <Badge variant="outline" className="bg-red-50 text-red-700 self-start">
-            <Shield className="w-4 h-4 mr-1" />
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold sm:text-2xl">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage departments, roles and account approvals in one place.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="gap-1">
+            <Shield className="h-3 w-3" />
             {userRole === 'super_admin' ? 'Super Admin' : 'Admin'}
           </Badge>
+          <Button variant="outline" size="sm" onClick={fetchAll}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="approvals">User Approvals</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6">
-          {/* Stats Cards and existing content */}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Sidebar */}
+        <nav className="flex gap-2 overflow-x-auto rounded-lg border bg-card p-2 lg:w-64 lg:flex-col lg:overflow-visible">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = section === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setSection(item.key)}
+                className={`flex flex-shrink-0 items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors lg:w-full ${
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap font-medium">{item.label}</span>
+                {item.key === 'approvals' && stats.pending > 0 && (
+                  <span className="ml-auto rounded-full bg-destructive px-2 text-xs text-destructive-foreground">
+                    {stats.pending}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Stats Cards - Mobile optimized grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-600">Pending Verifications</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{pendingVerifications.length}</p>
+        {/* Content */}
+        <div className="min-w-0 flex-1 space-y-4">
+          {section === 'overview' && (
+            <>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                <StatCard label="Total employees" value={stats.total} icon={Users} />
+                <StatCard label="Pending approvals" value={stats.pending} icon={Clock} />
+                <StatCard label="Approved" value={stats.approved} icon={UserCheck} />
+                <StatCard label="Rejected" value={stats.rejected} icon={UserX} />
+                <StatCard label="Departments" value={departmentCount} icon={Building2} />
+                <StatCard label="Admins & heads" value={stats.admins + stats.deptHeads} icon={Shield} />
               </div>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-yellow-100 rounded-lg flex items-center justify-center ml-2 flex-shrink-0">
-                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-600">Total Users</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{allUsers.length}</p>
-              </div>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-lg flex items-center justify-center ml-2 flex-shrink-0">
-                <Users className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick actions</CardTitle>
+                  <CardDescription>Jump straight to what needs attention.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-3">
+                  {navItems
+                    .filter((i) => i.key !== 'overview')
+                    .map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setSection(item.key)}
+                        className="rounded-lg border p-3 text-left transition-colors hover:bg-muted"
+                      >
+                        <p className="text-sm font-medium">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </button>
+                    ))}
+                </CardContent>
+              </Card>
+            </>
+          )}
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-600">Approved Users</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {allUsers.filter(u => u.status === 'APPROVED').length}
-                </p>
-              </div>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-lg flex items-center justify-center ml-2 flex-shrink-0">
-                <UserCheck className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {section === 'users' && (
+            <UserAdminTable
+              users={users}
+              canEditRoles={userRole === 'super_admin'}
+              currentUserId={user?.id}
+              onChanged={fetchAll}
+            />
+          )}
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-600">Rejected Users</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {allUsers.filter(u => u.status === 'REJECTED').length}
-                </p>
-              </div>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-lg flex items-center justify-center ml-2 flex-shrink-0">
-                <UserX className="w-3 h-3 sm:w-4 sm:h-4 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {section === 'departments' && <DepartmentManager />}
+
+          {section === 'approvals' && <ApprovalCenter />}
+        </div>
       </div>
-
-      {/* Pending Verifications */}
-      {pendingVerifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2 text-yellow-600" />
-              Pending Verification Requests
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6">
-            <div className="space-y-3 sm:space-y-4">
-              {pendingVerifications.map((request) => (
-                <div key={request.id} className="border rounded-lg p-3 sm:p-4 bg-yellow-50">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
-                        <AvatarFallback className="text-xs sm:text-sm">
-                          {getInitials(request.profiles.first_name, request.profiles.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-medium text-gray-900 text-sm sm:text-base">
-                          {request.profiles.first_name} {request.profiles.last_name}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-gray-600 truncate">{request.profiles.email}</p>
-                        {request.profiles.employee_id && (
-                          <p className="text-xs sm:text-sm text-gray-600">ID: {request.profiles.employee_id}</p>
-                        )}
-                        {request.profiles.position && (
-                          <p className="text-xs sm:text-sm text-gray-600 truncate">Position: {request.profiles.position}</p>
-                        )}
-                        <p className="text-xs text-gray-500 mt-1">
-                          Requested: {new Date(request.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row sm:flex-col lg:flex-row gap-2 self-start">
-                      <Button
-                        size="sm"
-                        onClick={() => handleVerificationAction(request.id, request.user_id, 'approve')}
-                        className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm flex-1 sm:flex-none"
-                      >
-                        <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Approve</span>
-                        <span className="xs:hidden">✓</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleVerificationAction(request.id, request.user_id, 'reject')}
-                        className="text-xs sm:text-sm flex-1 sm:flex-none"
-                      >
-                        <UserX className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Reject</span>
-                        <span className="xs:hidden">✗</span>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* All Users Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            User Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 sm:p-6">
-          <div className="space-y-3 sm:space-y-4">
-            {allUsers.map((user) => (
-              <div key={user.id} className="border rounded-lg p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
-                      <AvatarFallback className="text-xs sm:text-sm">
-                        {getInitials(user.first_name, user.last_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                        {user.first_name} {user.last_name}
-                      </h4>
-                      <p className="text-xs sm:text-sm text-gray-600 truncate">{user.email}</p>
-                      {user.position && (
-                        <p className="text-xs sm:text-sm text-gray-600 truncate">{user.position}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-2">
-                    <Badge className={`${getRoleColor(user.role)} text-xs`}>
-                      {user.role === 'dept_head' ? 'Dept Head' : user.role}
-                    </Badge>
-                    <Badge className={`${getStatusColor(user.status)} text-xs`}>
-                      {user.status === 'PENDING_VERIFICATION' ? 'Pending' : user.status}
-                    </Badge>
-                    {userRole === 'super_admin' && (
-                      <select
-                        value={user.role}
-                        onChange={(e) => updateUserRole(user.id, e.target.value)}
-                        className="text-xs sm:text-sm border rounded px-2 py-1 min-w-0 w-auto"
-                      >
-                         <option value="employee">Employee</option>
-                         <option value="dept_head">Dept Head</option>
-                         <option value="admin">Admin</option>
-                         <option value="super_admin">Super Admin</option>
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-        </TabsContent>
-        
-        <TabsContent value="approvals">
-          <ApprovalCenter />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
+
+const StatCard: React.FC<{ label: string; value: number; icon: React.ElementType }> = ({
+  label,
+  value,
+  icon: Icon,
+}) => (
+  <Card className="transition-shadow hover:shadow-md">
+    <CardContent className="flex items-center justify-between p-4">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+      </div>
+      <div className="ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+    </CardContent>
+  </Card>
+);
 
 export default AdminDashboard;
