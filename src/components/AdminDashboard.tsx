@@ -185,6 +185,10 @@ export const AdminDashboard = () => {
             </>
           )}
 
+          {section === 'invite' && (
+            <InviteEmployee canGrantAdmin={userRole === 'super_admin'} onInvited={fetchAll} />
+          )}
+
           {section === 'users' && (
             <UserAdminTable
               users={users}
