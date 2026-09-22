@@ -301,7 +301,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
 
   return (
