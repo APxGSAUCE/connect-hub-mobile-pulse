@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { realtimeService } from "@/services/realtimeService";
 import Index from "./pages/Index";
@@ -28,6 +28,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const LegacyPortalRedirect: React.FC<{ to: string }> = ({ to }) => {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
+};
 
 // Cleanup realtime subscriptions on app unmount
 const AppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -59,6 +64,13 @@ const App: React.FC = () => {
                 <Route path="/employees" element={<Index />} />
                 <Route path="/admin" element={<Index />} />
                 <Route path="/profile" element={<Index />} />
+                <Route path="/home" element={<LegacyPortalRedirect to="/" />} />
+                <Route path="/chat" element={<LegacyPortalRedirect to="/messages" />} />
+                <Route path="/calendar" element={<LegacyPortalRedirect to="/events" />} />
+                <Route path="/team" element={<LegacyPortalRedirect to="/employees" />} />
+                <Route path="/directory" element={<LegacyPortalRedirect to="/employees" />} />
+                <Route path="/account" element={<LegacyPortalRedirect to="/profile" />} />
+                <Route path="/settings" element={<LegacyPortalRedirect to="/profile" />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

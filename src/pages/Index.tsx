@@ -23,6 +23,7 @@ import { notificationService } from "@/services/notificationService";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import AdminDashboard from "@/components/AdminDashboard";
+import NotFound from "./NotFound";
 
 
 interface DashboardStats {
@@ -62,10 +63,12 @@ const Index = () => {
   const VALID_TABS = ["dashboard", "messages", "events", "employees", "admin", "profile"];
   // A section can be addressed directly (/messages) or via ?tab=messages (legacy links).
   const pathSection = location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+  const legacyTab = searchParams.get("tab")?.toLowerCase();
   const requestedTab = VALID_TABS.includes(pathSection)
     ? pathSection
-    : (searchParams.get("tab") || "dashboard").toLowerCase();
+    : (legacyTab || "dashboard");
   const activeTab = VALID_TABS.includes(requestedTab) ? requestedTab : "dashboard";
+  const hasInvalidLegacyTab = location.pathname === "/" && Boolean(legacyTab) && !VALID_TABS.includes(legacyTab || "");
   const setActiveTab = (tab: string) => {
     const target = tab === "dashboard" ? "/" : `/${tab}`;
     if (target !== location.pathname) {
@@ -302,6 +305,10 @@ const Index = () => {
 
   if (!user) {
     return <Navigate to="/auth" replace state={{ from: `${location.pathname}${location.search}` }} />;
+  }
+
+  if (hasInvalidLegacyTab) {
+    return <NotFound />;
   }
 
   return (
