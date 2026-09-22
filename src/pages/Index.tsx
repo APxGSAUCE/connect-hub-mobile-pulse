@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,19 @@ interface RecentEvent {
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const VALID_TABS = ["dashboard", "messages", "events", "employees", "admin", "profile"];
+  const tabParam = searchParams.get("tab") || "dashboard";
+  const activeTab = VALID_TABS.includes(tabParam) ? tabParam : "dashboard";
+  const setActiveTab = (tab: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "dashboard") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    setSearchParams(next, { replace: false });
+  };
   const [userRole, setUserRole] = useState<string>('');
   const [stats, setStats] = useState<DashboardStats>({
     total_messages: 0,
@@ -74,14 +86,6 @@ const Index = () => {
     notificationService.initialize();
   }, []);
 
-  // Check URL parameters for tab selection and handle shortcuts
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
-    if (tab && ['dashboard', 'messages', 'events', 'employees', 'admin'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
@@ -239,14 +243,6 @@ const Index = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-
-    const url = new URL(window.location.href);
-    if (tab === 'dashboard') {
-      url.searchParams.delete('tab');
-    } else {
-      url.searchParams.set('tab', tab);
-    }
-    window.history.pushState({}, '', url.toString());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
