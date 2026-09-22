@@ -309,7 +309,7 @@ const Index = () => {
             <TabsList
               className={`mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm border p-1 grid w-full ${
                 userRole === 'super_admin' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'
-              } md:flex md:w-auto md:justify-start md:gap-1 md:p-1.5`}
+              } md:flex md:w-full md:justify-start md:gap-1 md:p-1.5`}
             >
               <TabsTrigger
                 value="dashboard"
