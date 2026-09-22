@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,18 +29,20 @@ const Auth = () => {
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [departmentError, setDepartmentError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = (location.state as { from?: string } | null)?.from || "/";
   const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        navigate(redirectTo, { replace: true });
       }
     };
     checkAuth();
     fetchDepartments();
-  }, [navigate]);
+  }, [navigate, redirectTo]);
 
   const fetchDepartments = async () => {
     setLoadingDepartments(true);
@@ -189,7 +191,7 @@ const Auth = () => {
             title: "Welcome back!",
             description: "You have been successfully logged in.",
           });
-          navigate("/");
+          navigate(redirectTo, { replace: true });
         }
       } else {
         const redirectUrl = `${window.location.origin}/`;

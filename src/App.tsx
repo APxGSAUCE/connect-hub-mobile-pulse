@@ -53,6 +53,12 @@ const App: React.FC = () => {
                 <Route path="/password-policy" element={<PasswordPolicy />} />
                 <Route path="/access-status" element={<AccessStatus />} />
                 <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<Index />} />
+                <Route path="/messages" element={<Index />} />
+                <Route path="/events" element={<Index />} />
+                <Route path="/employees" element={<Index />} />
+                <Route path="/admin" element={<Index />} />
+                <Route path="/profile" element={<Index />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
