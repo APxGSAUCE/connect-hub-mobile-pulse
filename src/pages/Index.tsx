@@ -294,8 +294,9 @@ const Index = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center safe-area-inset">
+      <div className="min-h-dvh bg-background flex items-center justify-center safe-area-inset" role="status">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="sr-only">Loading employee portal</span>
       </div>
     );
   }
@@ -305,14 +306,18 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col ios-fix">
+    <div className="min-h-dvh bg-background flex flex-col ios-fix">
+      <a href="#portal-main" className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-md bg-primary px-4 py-2 text-primary-foreground shadow-lg transition-transform focus:translate-y-0">
+        Skip to main content
+      </a>
       <AppHeader 
         unreadNotifications={stats.unread_notifications}
         onNotificationCountChange={(count) => setStats(prev => ({ ...prev, unread_notifications: count }))}
+        onNavigate={handleTabChange}
       />
 
       {/* Main Content - Enhanced PWA responsiveness */}
-      <div className="flex-1 flex flex-col overflow-hidden safe-area-left safe-area-right">
+      <main id="portal-main" tabIndex={-1} className="flex-1 flex flex-col overflow-hidden safe-area-left safe-area-right">
         <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-5 lg:py-6 pb-24 md:pb-5 lg:pb-6 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col">
             {/* Phone: fixed bottom bar. Tablet: compact strip. Desktop: full navigation bar. */}
@@ -403,11 +408,9 @@ const Index = () => {
 
                 {/* Stats Cards - Mobile optimized with better spacing */}
                 <div className="grid grid-cols-2 gap-2 sm:gap-6">
-                  <Card 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleShortcutClick('messages')}
-                  >
-                    <CardContent className="p-3 sm:p-6">
+                  <Card>
+                    <Button variant="ghost" className="h-auto w-full justify-start whitespace-normal p-0 text-left" onClick={() => handleShortcutClick('messages')} aria-label={`Open messages, ${stats.unread_messages} unread`}>
+                    <CardContent className="w-full p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-gray-600">Conversations</p>
@@ -422,14 +425,12 @@ const Index = () => {
                           {stats.unread_messages} unread
                         </p>
                       )}
-                    </CardContent>
+                    </CardContent></Button>
                   </Card>
 
-                  <Card 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleShortcutClick('events')}
-                  >
-                    <CardContent className="p-3 sm:p-6">
+                  <Card>
+                    <Button variant="ghost" className="h-auto w-full justify-start whitespace-normal p-0 text-left" onClick={() => handleShortcutClick('events')} aria-label={`Open events, ${stats.upcoming_events} upcoming`}>
+                    <CardContent className="w-full p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-gray-600">Events</p>
@@ -440,14 +441,12 @@ const Index = () => {
                         </div>
                       </div>
                       <p className="text-xs text-green-600 mt-1">Upcoming</p>
-                    </CardContent>
+                    </CardContent></Button>
                   </Card>
 
-                  <Card 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleShortcutClick('employees')}
-                  >
-                    <CardContent className="p-3 sm:p-6">
+                  <Card>
+                    <Button variant="ghost" className="h-auto w-full justify-start whitespace-normal p-0 text-left" onClick={() => handleShortcutClick('employees')} aria-label={`Open employee directory, ${stats.total_employees} employees`}>
+                    <CardContent className="w-full p-3 sm:p-6">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-gray-600">Team</p>
@@ -458,7 +457,7 @@ const Index = () => {
                         </div>
                       </div>
                       <p className="text-xs text-purple-600 mt-1">Active users</p>
-                    </CardContent>
+                    </CardContent></Button>
                   </Card>
 
                   <Card className="hover:shadow-md transition-shadow">
@@ -587,7 +586,7 @@ const Index = () => {
             </div>
           </Tabs>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="bg-muted/30 border-t border-border/40 mt-auto">
