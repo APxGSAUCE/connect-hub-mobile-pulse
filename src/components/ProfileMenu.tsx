@@ -272,6 +272,7 @@ const ProfileMenu = () => {
               size="sm"
               onClick={handleEditToggle}
               disabled={loading}
+              aria-label={isEditing ? "Cancel profile editing" : "Edit profile"}
             >
               {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
             </Button>
@@ -292,14 +293,14 @@ const ProfileMenu = () => {
             </Avatar>
             {isEditing && (
               <div className="absolute -bottom-1 -right-1">
-                <label htmlFor="avatar-upload" className="cursor-pointer">
-                  <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
+                <label htmlFor="avatar-upload" className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2" aria-label="Upload profile picture">
+                  <span className="flex items-center justify-center">
                     {uploadingAvatar ? (
                       <Loader2 className="w-3 h-3 text-white animate-spin" />
                     ) : (
                       <Camera className="w-3 h-3 text-white" />
                     )}
-                  </div>
+                  </span>
                 </label>
                 <input
                   id="avatar-upload"
@@ -423,7 +424,7 @@ const ProfileMenu = () => {
                 onValueChange={(value) => setProfileData({ ...profileData, department_id: value === "none" ? "" : value })}
                 disabled={loading}
               >
-                <SelectTrigger>
+                <SelectTrigger id="department">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>

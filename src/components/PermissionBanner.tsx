@@ -16,19 +16,19 @@ export const PermissionBanner: React.FC<PermissionBannerProps> = ({ userRole, fe
 
   if (canCreate) {
     return (
-      <Card className="border-green-200 bg-green-50">
+      <Card className="border-border bg-accent">
         <CardContent className="p-4">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <Check className="w-4 h-4 text-green-600" />
+            <div className="w-8 h-8 bg-background rounded-full flex items-center justify-center">
+              <Check className="w-4 h-4 text-foreground" />
             </div>
             <div className="flex-1">
-              <h4 className="font-medium text-green-900">Full Access</h4>
-              <p className="text-sm text-green-700">
+              <h4 className="font-medium text-foreground">Full Access</h4>
+              <p className="text-sm text-muted-foreground">
                 You can {actionName} and participate in all {featureName}.
               </p>
             </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
+            <Badge variant="secondary">
               {userRole.role === 'super_admin' ? 'Super Admin' : 
                userRole.role === 'admin' ? 'Admin' : 'Department Head'}
             </Badge>
@@ -39,19 +39,19 @@ export const PermissionBanner: React.FC<PermissionBannerProps> = ({ userRole, fe
   }
 
   return (
-    <Card className="border-orange-200 bg-orange-50">
+    <Card className="border-border bg-muted">
       <CardContent className="p-4">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-            <Lock className="w-4 h-4 text-orange-600" />
+          <div className="w-8 h-8 bg-background rounded-full flex items-center justify-center">
+            <Lock className="w-4 h-4 text-foreground" />
           </div>
           <div className="flex-1">
-            <h4 className="font-medium text-orange-900">Limited Access</h4>
-            <p className="text-sm text-orange-700">
+            <h4 className="font-medium text-foreground">Limited Access</h4>
+            <p className="text-sm text-muted-foreground">
               You cannot {actionName}, but you can participate in existing {featureName} you're invited to.
             </p>
           </div>
-          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+          <Badge variant="secondary">
             Employee
           </Badge>
         </div>

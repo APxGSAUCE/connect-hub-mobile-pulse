@@ -124,7 +124,7 @@
     line-height: 1.5;
     
     /* PWA full-screen support */
-    height: 100vh;
+    min-height: 100dvh;
     height: -webkit-fill-available;
     overflow-x: hidden;
     margin: 0;
@@ -132,7 +132,7 @@
   }
 
   #root {
-    min-height: 100vh;
+    min-height: 100dvh;
     min-height: -webkit-fill-available;
     display: flex;
     flex-direction: column;
@@ -166,6 +166,18 @@
   input, select, textarea {
     font-size: 16px; /* Prevent zoom on iOS */
     border-radius: 8px;
+  }
+}
+
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [role="tab"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
 

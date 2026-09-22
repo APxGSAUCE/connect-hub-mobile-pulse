@@ -1,294 +1,237 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, ArrowLeft, Check, MessageSquare, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, Bell, Calendar, Check, CheckCircle2, FileText, Loader2, MessageSquare, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { notificationService } from "@/services/notificationService";
 
-interface AppNotification {
+type ActivityKind = "message" | "event" | "task" | "file";
+type ActivityFilter = "all" | ActivityKind;
+
+interface ActivityItem {
   id: string;
+  sourceId: string;
+  kind: ActivityKind;
   title: string;
-  message: string;
-  type: string;
-  is_read: boolean;
-  created_at: string;
-  related_id?: string;
-  related_type?: string;
+  description: string;
+  createdAt: string;
+  unread: boolean;
+  notificationId?: string;
 }
 
 interface NotificationCenterProps {
   unreadCount: number;
   onCountChange: (count: number) => void;
+  onNavigate?: (section: "messages" | "events" | "employees" | "admin") => void;
 }
 
-export const NotificationCenter = ({ unreadCount, onCountChange }: NotificationCenterProps) => {
+const FILTERS: Array<{ value: ActivityFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "message", label: "Messages" },
+  { value: "event", label: "Events" },
+  { value: "task", label: "Tasks" },
+  { value: "file", label: "Files" },
+];
+
+export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: NotificationCenterProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [filter, setFilter] = useState<ActivityFilter>("all");
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchActivity = useCallback(async () => {
     if (!user) return;
+    setLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const [notificationsResult, eventsResult, membershipsResult] = await Promise.all([
+        supabase.from("notifications").select("id,title,message,type,is_read,created_at,related_id,related_type").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("events").select("id,title,start_date,location,event_type").gte("start_date", new Date().toISOString()).order("start_date", { ascending: true }).limit(20),
+        supabase.from("chat_group_members").select("group_id").eq("user_id", user.id),
+      ]);
 
-      if (error) throw error;
+      if (notificationsResult.error) throw notificationsResult.error;
+      if (eventsResult.error) throw eventsResult.error;
+      if (membershipsResult.error) throw membershipsResult.error;
 
-      setNotifications(data || []);
-      const unread = (data || []).filter(n => !n.is_read).length;
-      onCountChange(unread);
+      const groupIds = (membershipsResult.data || []).map((membership) => membership.group_id);
+      const messagesResult = groupIds.length
+        ? await supabase.from("messages").select("id,content,created_at,sender_id,file_url,file_name").in("group_id", groupIds).neq("sender_id", user.id).order("created_at", { ascending: false }).limit(50)
+        : { data: [], error: null };
+      if (messagesResult.error) throw messagesResult.error;
+
+      const messageIds = (messagesResult.data || []).map((message) => message.id);
+      const receiptsResult = messageIds.length
+        ? await supabase.from("message_read_receipts").select("message_id").eq("user_id", user.id).in("message_id", messageIds)
+        : { data: [], error: null };
+      if (receiptsResult.error) throw receiptsResult.error;
+      const readMessageIds = new Set((receiptsResult.data || []).map((receipt) => receipt.message_id));
+
+      const notificationItems: ActivityItem[] = (notificationsResult.data || [])
+        .filter((notification) => notification.type !== "message" && notification.type !== "event")
+        .map((notification) => ({
+          id: `notification-${notification.id}`,
+          sourceId: notification.related_id || notification.id,
+          notificationId: notification.id,
+          kind: "task",
+          title: notification.title,
+          description: notification.message,
+          createdAt: notification.created_at,
+          unread: !notification.is_read,
+        }));
+
+      const messageItems: ActivityItem[] = (messagesResult.data || []).map((message) => ({
+        id: `message-${message.id}`,
+        sourceId: message.id,
+        kind: message.file_url ? "file" : "message",
+        title: message.file_url ? (message.file_name || "Shared file") : "New message",
+        description: message.file_url ? (message.content || "A file was shared with you") : message.content,
+        createdAt: message.created_at || new Date().toISOString(),
+        unread: !readMessageIds.has(message.id),
+      }));
+
+      const eventItems: ActivityItem[] = (eventsResult.data || []).map((event) => ({
+        id: `event-${event.id}`,
+        sourceId: event.id,
+        kind: "event",
+        title: event.title,
+        description: `${new Date(event.start_date).toLocaleString()}${event.location ? ` · ${event.location}` : ""}`,
+        createdAt: event.start_date,
+        unread: false,
+      }));
+
+      const nextItems = [...notificationItems, ...messageItems, ...eventItems]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setItems(nextItems);
+      onCountChange(nextItems.filter((item) => item.unread).length);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error("Error fetching activity:", error);
+      toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [user, onCountChange]);
+  }, [onCountChange, toast, user]);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  useEffect(() => { fetchActivity(); }, [fetchActivity]);
+  useRealtimeSubscription("messages", fetchActivity, [user]);
+  useRealtimeSubscription("events", fetchActivity, [user]);
+  useRealtimeSubscription("notifications", fetchActivity, [user]);
 
-  // Real-time notification updates
-  useRealtimeSubscription('notifications', useCallback(() => {
-    fetchNotifications();
-    // Show browser notification for new notifications when app is not focused
-    if (document.hidden || !document.hasFocus()) {
-      notificationService.showSystemNotification(
-        'New Notification',
-        'You have a new notification in PGIS Employee Portal'
-      );
-    }
-  }, [fetchNotifications]), [user]);
+  const visibleItems = useMemo(() => filter === "all" ? items : items.filter((item) => item.kind === filter), [filter, items]);
+  const countFor = (kind: ActivityFilter) => kind === "all" ? items.length : items.filter((item) => item.kind === kind).length;
 
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (item: ActivityItem) => {
+    if (!user || !item.unread) return;
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-      );
-      
-      const newUnreadCount = notifications.filter(n => !n.is_read && n.id !== notificationId).length;
-      onCountChange(newUnreadCount);
+      if (item.notificationId) {
+        const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", item.notificationId).eq("user_id", user.id);
+        if (error) throw error;
+      } else if (item.kind === "message" || item.kind === "file") {
+        const { error } = await supabase.rpc("mark_message_as_read", { message_id_param: item.sourceId, user_id_param: user.id });
+        if (error) throw error;
+      }
+      setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, unread: false } : entry));
+      onCountChange(Math.max(0, unreadCount - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark notification as read",
-        variant: "destructive"
-      });
+      console.error("Error marking activity as read:", error);
+      toast({ title: "Update failed", description: "Could not mark this item as read.", variant: "destructive" });
     }
   };
 
   const markAllAsRead = async () => {
+    if (!user) return;
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user?.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      const unreadNotifications = items.filter((item) => item.unread && item.notificationId);
+      const unreadMessages = items.filter((item) => item.unread && !item.notificationId && (item.kind === "message" || item.kind === "file"));
+      const notificationUpdate = unreadNotifications.length
+        ? supabase.from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false)
+        : Promise.resolve({ error: null });
+      const results = await Promise.all([
+        notificationUpdate,
+        ...unreadMessages.map((item) => supabase.rpc("mark_message_as_read", { message_id_param: item.sourceId, user_id_param: user.id })),
+      ]);
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+      setItems((current) => current.map((item) => ({ ...item, unread: false })));
       onCountChange(0);
-
-      toast({
-        title: "Success",
-        description: "All notifications marked as read"
-      });
+      toast({ title: "Activity updated", description: "Everything is marked as read." });
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark all notifications as read",
-        variant: "destructive"
-      });
+      console.error("Error marking all activity as read:", error);
+      toast({ title: "Update failed", description: "Could not mark all activity as read.", variant: "destructive" });
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'message': return <MessageSquare className="w-4 h-4 text-blue-600" />;
-      case 'event': return <Calendar className="w-4 h-4 text-green-600" />;
-      case 'system': return <AlertCircle className="w-4 h-4 text-orange-600" />;
-      default: return <Bell className="w-4 h-4 text-gray-600" />;
-    }
+  const openItem = async (item: ActivityItem) => {
+    await markAsRead(item);
+    setIsOpen(false);
+    if (item.kind === "message" || item.kind === "file") onNavigate?.("messages");
+    if (item.kind === "event") onNavigate?.("events");
+    if (item.kind === "task") onNavigate?.("employees");
   };
 
-  const getNotificationBgColor = (type: string) => {
-    switch (type) {
-      case 'message': return 'bg-blue-50 border-blue-200';
-      case 'event': return 'bg-green-50 border-green-200';
-      case 'system': return 'bg-orange-50 border-orange-200';
-      default: return 'bg-gray-50 border-gray-200';
-    }
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  const iconFor = (kind: ActivityKind) => {
+    if (kind === "message") return <MessageSquare aria-hidden="true" className="h-4 w-4" />;
+    if (kind === "event") return <Calendar aria-hidden="true" className="h-4 w-4" />;
+    if (kind === "file") return <FileText aria-hidden="true" className="h-4 w-4" />;
+    return <AlertCircle aria-hidden="true" className="h-4 w-4" />;
   };
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative p-1.5 sm:p-2 touch-manipulation">
-          <Bell className="w-4 h-4" />
-          {unreadCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 p-0 flex items-center justify-center text-xs animate-pulse">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </Badge>
-          )}
+        <Button variant="ghost" size="icon" className="relative min-h-11 min-w-11" aria-label={`Activity center${unreadCount ? `, ${unreadCount} unread` : ""}`}>
+          <Bell aria-hidden="true" />
+          {unreadCount > 0 && <Badge aria-hidden="true" className="absolute right-0 top-0 h-5 min-w-5 justify-center px-1 text-[10px]">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}
         </Button>
       </SheetTrigger>
-      
-      <SheetContent 
-            className="w-80 max-w-[90vw] flex flex-col p-3 sm:p-6"
-            side="right"
-            showClose={false}
-            onTouchStart={(e) => {
-              const t = e.touches[0];
-              touchStart.current = { x: t.clientX, y: t.clientY };
-            }}
-            onTouchEnd={(e) => {
-              const t = e.changedTouches[0];
-              if (!touchStart.current) return;
-              const dx = t.clientX - touchStart.current.x;
-              const dy = t.clientY - touchStart.current.y;
-              if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
-                setIsOpen(false);
-              }
-              touchStart.current = null;
-            }}
-          >
-        <SheetHeader className="pb-3 sm:pb-4 pr-4 sm:pr-6">
+      <SheetContent className="flex w-[min(100vw,28rem)] flex-col p-0" side="right" showClose={false}
+        onTouchStart={(event) => { const touch = event.touches[0]; touchStart.current = { x: touch.clientX, y: touch.clientY }; }}
+        onTouchEnd={(event) => { const touch = event.changedTouches[0]; if (!touchStart.current) return; const dx = touch.clientX - touchStart.current.x; const dy = touch.clientY - touchStart.current.y; if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) setIsOpen(false); touchStart.current = null; }}>
+        <SheetHeader className="border-b p-4 text-left">
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(false)}
-              className="h-8 w-8 sm:h-9 sm:w-9 -ml-1"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <SheetTitle className="flex items-center gap-1 sm:gap-2 flex-wrap">
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-              <span className="text-sm sm:text-base leading-tight">Notifications</span>
-              {unreadCount > 0 && (
-                <Badge variant="secondary" className="text-xs">{unreadCount}</Badge>
-              )}
-            </SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="min-h-11 min-w-11" aria-label="Close activity center"><ArrowLeft aria-hidden="true" /></Button>
+            <div className="min-w-0 flex-1">
+              <SheetTitle>Activity Center</SheetTitle>
+              <p className="text-sm text-muted-foreground" aria-live="polite">{unreadCount} unread item{unreadCount === 1 ? "" : "s"}</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={fetchActivity} className="min-h-11 min-w-11" aria-label="Refresh activity"><RefreshCw aria-hidden="true" className={loading ? "animate-spin" : ""} /></Button>
           </div>
-          {unreadCount > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={markAllAsRead}
-              className="text-xs mt-1 sm:mt-2 w-fit h-7 sm:h-8"
-            >
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Mark all read
-            </Button>
-          )}
+          <div className="flex gap-1 overflow-x-auto pb-1" aria-label="Filter activity">
+            {FILTERS.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
+          </div>
+          {unreadCount > 0 && <Button variant="outline" size="sm" onClick={markAllAsRead} className="min-h-11 self-start"><CheckCircle2 aria-hidden="true" />Mark all read</Button>}
         </SheetHeader>
 
-        <ScrollArea className="flex-1 -mx-3 sm:-mx-6 px-3 sm:px-6">
+        <ScrollArea className="flex-1">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bell className="w-12 h-12 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No notifications yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                You'll see updates from your team here
-              </p>
-            </div>
+            <div className="flex min-h-48 items-center justify-center" role="status"><Loader2 aria-hidden="true" className="animate-spin" /><span className="sr-only">Loading activity</span></div>
+          ) : visibleItems.length === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center p-6 text-center"><Bell aria-hidden="true" className="mb-3 h-10 w-10 text-muted-foreground" /><p className="font-medium">No activity here</p><p className="text-sm text-muted-foreground">New updates will appear automatically.</p></div>
           ) : (
-            <div className="space-y-2 sm:space-y-3">
-              {notifications.map((notification) => (
-                <Card 
-                  key={notification.id}
-                  className={`relative transition-all duration-200 hover:shadow-md ${
-                    notification.is_read 
-                      ? 'bg-background border-border opacity-75' 
-                      : getNotificationBgColor(notification.type)
-                  }`}
-                >
-                  <CardContent className="p-2 sm:p-3">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0 pr-1 sm:pr-2">
-                        <div className="flex items-start justify-between gap-1">
-                          <h4 className={`text-xs font-medium leading-4 break-words pr-1 ${
-                            notification.is_read ? 'text-muted-foreground' : 'text-foreground'
-                          }`}>
-                            {notification.title}
-                          </h4>
-                          {!notification.is_read && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => markAsRead(notification.id)}
-                              className="p-0.5 h-5 w-5 hover:bg-background/50 flex-shrink-0 touch-manipulation"
-                            >
-                              <Check className="w-2.5 h-2.5" />
-                            </Button>
-                          )}
-                        </div>
-                        
-                        <p className={`text-xs mt-0.5 leading-3 break-words ${
-                          notification.is_read ? 'text-muted-foreground' : 'text-foreground/80'
-                        }`}>
-                          {notification.message}
-                        </p>
-                        
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatTime(notification.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {!notification.is_read && (
-                      <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full"></div>
-                    )}
-                  </CardContent>
-                </Card>
+            <ul className="divide-y" aria-label={`${FILTERS.find((option) => option.value === filter)?.label} activity`}>
+              {visibleItems.map((item) => (
+                <li key={item.id} className={item.unread ? "bg-accent/70" : "bg-background"}>
+                  <div className="flex items-start gap-3 p-4">
+                    <span className="mt-1 rounded-md bg-muted p-2 text-foreground">{iconFor(item.kind)}</span>
+                    <Button variant="ghost" onClick={() => openItem(item)} className="h-auto min-w-0 flex-1 justify-start whitespace-normal p-0 text-left hover:bg-transparent">
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{item.title}</span><Badge variant={item.unread ? "default" : "outline"}>{item.unread ? "Unread" : item.kind === "event" ? "Upcoming" : "Read"}</Badge></span>
+                        <span className="mt-1 block text-sm text-muted-foreground">{item.description}</span>
+                        <span className="mt-2 block text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</span>
+                      </span>
+                    </Button>
+                    {item.unread && <Button variant="ghost" size="icon" onClick={() => markAsRead(item)} className="min-h-11 min-w-11" aria-label={`Mark ${item.title} as read`}><Check aria-hidden="true" /></Button>}
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </ScrollArea>
       </SheetContent>

@@ -44,8 +44,8 @@ export const EmployeeCard = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Avatar className="w-12 h-12">
-              {resolvedAvatarUrl && <AvatarImage src={resolvedAvatarUrl} alt="Profile" />}
-              <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+              {resolvedAvatarUrl && <AvatarImage src={resolvedAvatarUrl} alt={`${employee.first_name} ${employee.last_name}`} />}
+              <AvatarFallback className="bg-secondary text-secondary-foreground text-lg">
                 {getInitials(employee.first_name, employee.last_name)}
               </AvatarFallback>
             </Avatar>
@@ -61,6 +61,8 @@ export const EmployeeCard = ({
               size="sm"
               variant="outline"
               onClick={() => onDirectMessage(employee.id, `${employee.first_name} ${employee.last_name}`)}
+              aria-label={`Message ${employee.first_name} ${employee.last_name}`}
+              className="min-h-11 min-w-11"
             >
               <MessageSquare className="w-4 h-4" />
             </Button>
@@ -93,10 +95,10 @@ export const EmployeeCard = ({
             <Badge
               variant="secondary"
               className={`text-xs ${
-                employee.status === 'active' ? 'bg-green-100 text-green-600' :
-                employee.status === 'muted' ? 'bg-yellow-100 text-yellow-600' :
-                employee.status === 'blocked' ? 'bg-red-100 text-red-600' :
-                'bg-gray-100 text-gray-600'
+                employee.status === 'active' ? 'bg-secondary text-secondary-foreground' :
+                employee.status === 'muted' ? 'bg-muted text-foreground' :
+                employee.status === 'blocked' ? 'bg-destructive text-destructive-foreground' :
+                'bg-muted text-muted-foreground'
               }`}
             >
               {employee.status}
