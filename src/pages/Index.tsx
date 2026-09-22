@@ -397,11 +397,11 @@ const Index = () => {
             <div className="flex-1 overflow-hidden">
               <TabsContent value="dashboard" className="space-y-3 sm:space-y-6 h-full overflow-y-auto">
                 {/* Welcome Section - PWA optimized */}
-                <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6">
-                  <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
+                <div className="bg-card rounded-lg border shadow-sm p-3 sm:p-6">
+                  <h2 className="text-lg sm:text-2xl font-bold text-card-foreground mb-1 sm:mb-2">
                     Welcome back! 👋
                   </h2>
-                  <p className="text-xs sm:text-sm text-gray-600">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Here's what's happening in your organization today.
                   </p>
                 </div>

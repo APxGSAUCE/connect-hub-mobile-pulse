@@ -125,6 +125,16 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   useRealtimeSubscription("notifications", fetchActivity, [user]);
 
   const visibleItems = useMemo(() => filter === "all" ? items : items.filter((item) => item.kind === filter), [filter, items]);
+  const groupedItems = useMemo(() => {
+    const order: ActivityKind[] = ["message", "event", "task", "file"];
+    return order
+      .map((kind) => ({
+        kind,
+        label: kind === "message" ? "Unread Messages" : kind === "event" ? "Upcoming Events" : kind === "task" ? "Task Updates" : "File Activity",
+        items: visibleItems.filter((item) => item.kind === kind),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [visibleItems]);
   const countFor = (kind: ActivityFilter) => kind === "all" ? items.length : items.filter((item) => item.kind === kind).length;
 
   const markAsRead = async (item: ActivityItem) => {
@@ -215,23 +225,33 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
           ) : visibleItems.length === 0 ? (
             <div className="flex min-h-48 flex-col items-center justify-center p-6 text-center"><Bell aria-hidden="true" className="mb-3 h-10 w-10 text-muted-foreground" /><p className="font-medium">No activity here</p><p className="text-sm text-muted-foreground">New updates will appear automatically.</p></div>
           ) : (
-            <ul className="divide-y" aria-label={`${FILTERS.find((option) => option.value === filter)?.label} activity`}>
-              {visibleItems.map((item) => (
-                <li key={item.id} className={item.unread ? "bg-accent/70" : "bg-background"}>
-                  <div className="flex items-start gap-3 p-4">
-                    <span className="mt-1 rounded-md bg-muted p-2 text-foreground">{iconFor(item.kind)}</span>
-                    <Button variant="ghost" onClick={() => openItem(item)} className="h-auto min-w-0 flex-1 justify-start whitespace-normal p-0 text-left hover:bg-transparent">
-                      <span className="min-w-0">
-                        <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{item.title}</span><Badge variant={item.unread ? "default" : "outline"}>{item.unread ? "Unread" : item.kind === "event" ? "Upcoming" : "Read"}</Badge></span>
-                        <span className="mt-1 block text-sm text-muted-foreground">{item.description}</span>
-                        <span className="mt-2 block text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</span>
-                      </span>
-                    </Button>
-                    {item.unread && <Button variant="ghost" size="icon" onClick={() => markAsRead(item)} className="min-h-11 min-w-11" aria-label={`Mark ${item.title} as read`}><Check aria-hidden="true" /></Button>}
+            <div aria-label={`${FILTERS.find((option) => option.value === filter)?.label} activity`}>
+              {groupedItems.map((group) => (
+                <section key={group.kind} aria-labelledby={`activity-${group.kind}`}>
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-y bg-muted px-4 py-2">
+                    <h3 id={`activity-${group.kind}`} className="text-sm font-semibold">{group.label}</h3>
+                    <Badge variant="outline">{group.items.length}</Badge>
                   </div>
-                </li>
+                  <ul className="divide-y">
+                    {group.items.map((item) => (
+                      <li key={item.id} className={item.unread ? "bg-accent/70" : "bg-background"}>
+                        <div className="flex items-start gap-3 p-4">
+                          <span className="mt-1 rounded-md bg-muted p-2 text-foreground">{iconFor(item.kind)}</span>
+                          <Button variant="ghost" onClick={() => openItem(item)} className="h-auto min-w-0 flex-1 justify-start whitespace-normal p-0 text-left hover:bg-transparent">
+                            <span className="min-w-0">
+                              <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{item.title}</span><Badge variant={item.unread ? "default" : "outline"}>{item.unread ? "Unread" : item.kind === "event" ? "Upcoming" : "Read"}</Badge></span>
+                              <span className="mt-1 block text-sm text-muted-foreground">{item.description}</span>
+                              <span className="mt-2 block text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</span>
+                            </span>
+                          </Button>
+                          {item.unread && <Button variant="ghost" size="icon" onClick={() => markAsRead(item)} className="min-h-11 min-w-11" aria-label={`Mark ${item.title} as read`}><Check aria-hidden="true" /></Button>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
         </ScrollArea>
       </SheetContent>
