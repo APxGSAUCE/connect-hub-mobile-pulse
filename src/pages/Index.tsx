@@ -243,14 +243,6 @@ const Index = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-
-    const url = new URL(window.location.href);
-    if (tab === 'dashboard') {
-      url.searchParams.delete('tab');
-    } else {
-      url.searchParams.set('tab', tab);
-    }
-    window.history.pushState({}, '', url.toString());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
