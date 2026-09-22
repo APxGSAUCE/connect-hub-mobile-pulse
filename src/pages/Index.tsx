@@ -86,14 +86,6 @@ const Index = () => {
     notificationService.initialize();
   }, []);
 
-  // Check URL parameters for tab selection and handle shortcuts
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
-    if (tab && ['dashboard', 'messages', 'events', 'employees', 'admin'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
