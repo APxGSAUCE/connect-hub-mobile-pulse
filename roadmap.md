@@ -1,6 +1,6 @@
 - [x] Complete portal accessibility fixes
 - [x] Build grouped activity center
 - [x] Validate phone, tablet, and desktop layouts
-- [ ] Add branded invalid-link recovery page
-- [ ] Add safe aliases for outdated portal URLs
-- [ ] Verify direct, refreshed, and back/forward section navigation
+- [x] Add branded invalid-link recovery page
+- [x] Add safe aliases for outdated portal URLs
+- [x] Verify direct, refreshed, and back/forward section navigation
