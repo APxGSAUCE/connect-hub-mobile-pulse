@@ -56,7 +56,19 @@ interface RecentEvent {
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const VALID_TABS = ["dashboard", "messages", "events", "employees", "admin", "profile"];
+  const tabParam = searchParams.get("tab") || "dashboard";
+  const activeTab = VALID_TABS.includes(tabParam) ? tabParam : "dashboard";
+  const setActiveTab = (tab: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "dashboard") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    setSearchParams(next, { replace: false });
+  };
   const [userRole, setUserRole] = useState<string>('');
   const [stats, setStats] = useState<DashboardStats>({
     total_messages: 0,
