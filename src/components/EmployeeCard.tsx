@@ -39,7 +39,7 @@ export const EmployeeCard = ({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card id={`employee-${employee.id}`} className="hover:shadow-md transition-shadow target:ring-2 target:ring-ring">
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">

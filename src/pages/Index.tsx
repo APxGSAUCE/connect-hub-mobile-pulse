@@ -68,7 +68,7 @@ const Index = () => {
   // A section can be addressed directly (/messages) or via ?tab=messages (legacy links).
   const pathSection = location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
   const legacyTab = searchParams.get("tab")?.toLowerCase();
-  const requestedTab = VALID_TABS.includes(pathSection)
+  const requestedTab = VALID_TABS.includes(pathSection as PortalSection)
     ? pathSection
     : (legacyTab || "dashboard");
   const activeTab: PortalSection = VALID_TABS.includes(requestedTab as PortalSection) ? requestedTab as PortalSection : "dashboard";

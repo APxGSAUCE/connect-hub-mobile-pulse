@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { getSignedFileUrl } from "@/lib/storageUtils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ interface Profile {
 }
 
 const EventCalendar = () => {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const { userRole, loading: roleLoading } = useUserRole();
@@ -137,6 +139,12 @@ const EventCalendar = () => {
       fetchEmployees();
     }
   }, [user, userRole]);
+
+  useEffect(() => {
+    const eventId = searchParams.get("eventId");
+    if (!eventId || loading) return;
+    window.requestAnimationFrame(() => document.getElementById(`event-${eventId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [loading, searchParams]);
 
   // Set up real-time subscription for events
   useRealtimeSubscription('events', fetchEvents, [user]);
@@ -482,24 +490,11 @@ const EventCalendar = () => {
           <p className="text-sm sm:text-base text-gray-600">Manage and view upcoming events</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        {userRole?.can_create_events && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
-              className="w-full sm:w-auto" 
-              onClick={() => setIsDialogOpen(true)}
-              disabled={!userRole?.can_create_events}
-            >
-              {userRole?.can_create_events ? (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Event
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4 mr-2" />
-                  Cannot Create Events
-                </>
-              )}
+            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Event
             </Button>
           </DialogTrigger>
           <DialogContent className="w-[95vw] max-w-[500px] max-h-[85vh] overflow-y-auto mx-auto p-4 sm:p-6">
@@ -726,7 +721,7 @@ const EventCalendar = () => {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Events List */}
@@ -735,7 +730,7 @@ const EventCalendar = () => {
           events.map((event) => {
             const eventStatus = getEventStatus(event.start_date, event.end_date);
             return (
-              <Card key={event.id} className="hover:shadow-md transition-shadow">
+              <Card id={`event-${event.id}`} key={event.id} className={`hover:shadow-md transition-shadow ${searchParams.get("eventId") === event.id ? "ring-2 ring-ring" : ""}`}>
                 <CardHeader className="pb-2 sm:pb-3">
                   {resolvedImageUrls[event.id] && (
                     <div className="mb-3">
@@ -824,10 +819,10 @@ const EventCalendar = () => {
               <Calendar className="w-12 h-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
               <p className="text-gray-500 mb-4">Create your first event to get started</p>
-              <Button onClick={() => setIsDialogOpen(true)}>
+              {userRole?.can_create_events && <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Event
-              </Button>
+              </Button>}
             </CardContent>
           </Card>
         )}
