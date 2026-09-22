@@ -634,8 +634,9 @@ const SimpleMessageCenter = () => {
               {/* Direct Message Form */}
               <div className="space-y-4 border-t pt-4">
                 <div className="space-y-2">
-                  <Label>Select Employee</Label>
+                  <Label htmlFor="direct-message-employee">Select Employee</Label>
                   <select
+                    id="direct-message-employee"
                     className="w-full p-2 border rounded-md"
                     value={selectedEmployee}
                     onChange={(e) => setSelectedEmployee(e.target.value)}
@@ -687,6 +688,7 @@ const SimpleMessageCenter = () => {
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
                 <Input
+                  aria-label="Search chats"
                   placeholder="Search chats..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -699,10 +701,12 @@ const SimpleMessageCenter = () => {
                 {filteredGroups.length > 0 ? (
                   <div className="space-y-2 p-4">
                     {filteredGroups.map((group) => (
-                      <div
+                      <Button
                         key={group.id}
                         onClick={() => handleGroupSelect(group)}
-                        className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        variant="ghost"
+                        aria-pressed={selectedGroup?.id === group.id}
+                        className={`h-auto w-full justify-start whitespace-normal p-3 text-left transition-colors ${
                           selectedGroup?.id === group.id
                             ? 'bg-blue-50 border-blue-200 border'
                             : 'hover:bg-gray-50'
@@ -745,7 +749,7 @@ const SimpleMessageCenter = () => {
                              )}
                           </div>
                         </div>
-                      </div>
+                      </Button>
                     ))}
                   </div>
                 ) : (
@@ -875,13 +879,14 @@ const SimpleMessageCenter = () => {
                   <div className="border-t p-4">
                     <div className="flex space-x-2">
                       <Input
+                        aria-label={`Message ${selectedGroup.name}`}
                         placeholder="Type a message..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                         className="flex-1"
                       />
-                      <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                      <Button onClick={handleSendMessage} disabled={!newMessage.trim()} aria-label="Send message" className="min-h-11 min-w-11">
                         <Send className="w-4 h-4" />
                       </Button>
                     </div>

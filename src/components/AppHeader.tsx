@@ -8,9 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 interface AppHeaderProps {
   unreadNotifications: number;
   onNotificationCountChange: (count: number) => void;
+  onNavigate: (section: "messages" | "events" | "employees" | "admin") => void;
 }
 
-export const AppHeader = ({ unreadNotifications, onNotificationCountChange }: AppHeaderProps) => {
+export const AppHeader = ({ unreadNotifications, onNotificationCountChange, onNavigate }: AppHeaderProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
 
@@ -36,7 +37,7 @@ export const AppHeader = ({ unreadNotifications, onNotificationCountChange }: Ap
   };
 
   return (
-    <header className="bg-white shadow-sm border-b flex-shrink-0 pwa-header sticky top-0 z-40">
+    <header className="bg-background shadow-sm border-b flex-shrink-0 pwa-header sticky top-0 z-40">
       <div className="app-header-alignment">
         <div className="header-title-align">
           {/* Logo and Title */}
@@ -48,7 +49,7 @@ export const AppHeader = ({ unreadNotifications, onNotificationCountChange }: Ap
                 className="w-full h-full object-contain rounded-lg"
               />
             </div>
-            <h1 className="text-sm sm:text-lg font-bold text-gray-900 truncate">
+            <h1 className="text-sm sm:text-lg font-bold text-foreground truncate">
               PGIS EMPLOYEE PORTAL
             </h1>
           </div>
@@ -58,11 +59,12 @@ export const AppHeader = ({ unreadNotifications, onNotificationCountChange }: Ap
             <NotificationCenter 
               unreadCount={unreadNotifications} 
               onCountChange={onNotificationCountChange}
+                onNavigate={onNavigate}
             />
             
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
-                <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+              <Avatar className="w-8 h-8 sm:w-9 sm:h-9">
+                <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
                   {getInitials(user?.email || 'User')}
                 </AvatarFallback>
               </Avatar>
@@ -83,7 +85,8 @@ export const AppHeader = ({ unreadNotifications, onNotificationCountChange }: Ap
                 variant="outline" 
                 size="sm" 
                 onClick={handleSignOut} 
-                className="sm:hidden p-2 text-muted-foreground hover:text-destructive hover:border-destructive/20 hover:bg-destructive/5 transition-colors"
+                className="sm:hidden min-h-11 min-w-11 p-2 text-muted-foreground hover:text-destructive hover:border-destructive/20 hover:bg-destructive/5 transition-colors"
+                aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
               </Button>

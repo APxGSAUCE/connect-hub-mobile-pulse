@@ -24,8 +24,8 @@ export const EmployeeFilters = ({
   departments
 }: EmployeeFiltersProps) => {
   return (
-    <div className="flex space-x-4 items-center">
-      <div className="flex items-center space-x-2">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+      <div className="grid flex-1 gap-2">
         <Label htmlFor="search">Search:</Label>
         <Input
           type="text"
@@ -35,10 +35,10 @@ export const EmployeeFilters = ({
           onChange={(e) => onSearchChange(e.target.value)}
         />
       </div>
-      <div>
+      <div className="grid flex-1 gap-2">
         <Label htmlFor="department">Department:</Label>
         <Select value={selectedDepartment} onValueChange={onDepartmentChange}>
-          <SelectTrigger>
+          <SelectTrigger id="department">
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
