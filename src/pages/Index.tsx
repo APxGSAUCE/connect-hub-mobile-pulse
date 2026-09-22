@@ -56,18 +56,21 @@ interface RecentEvent {
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const VALID_TABS = ["dashboard", "messages", "events", "employees", "admin", "profile"];
-  const tabParam = searchParams.get("tab") || "dashboard";
-  const activeTab = VALID_TABS.includes(tabParam) ? tabParam : "dashboard";
+  // A section can be addressed directly (/messages) or via ?tab=messages (legacy links).
+  const pathSection = location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+  const requestedTab = VALID_TABS.includes(pathSection)
+    ? pathSection
+    : (searchParams.get("tab") || "dashboard").toLowerCase();
+  const activeTab = VALID_TABS.includes(requestedTab) ? requestedTab : "dashboard";
   const setActiveTab = (tab: string) => {
-    const next = new URLSearchParams(searchParams);
-    if (tab === "dashboard") {
-      next.delete("tab");
-    } else {
-      next.set("tab", tab);
+    const target = tab === "dashboard" ? "/" : `/${tab}`;
+    if (target !== location.pathname) {
+      navigate(target);
     }
-    setSearchParams(next, { replace: false });
   };
   const [userRole, setUserRole] = useState<string>('');
   const [stats, setStats] = useState<DashboardStats>({
