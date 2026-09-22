@@ -305,59 +305,63 @@ const Index = () => {
       <div className="flex-1 flex flex-col overflow-hidden safe-area-left safe-area-right">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            {/* Mobile-optimized tab navigation with better spacing */}
-            <TabsList className={`grid w-full ${userRole === 'super_admin' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'} mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm mx-1`}>
-              <TabsTrigger 
-                value="dashboard" 
-                className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+            {/* Navigation: compact icon grid on phones, full horizontal nav bar on desktop */}
+            <TabsList
+              className={`mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm border p-1 grid w-full ${
+                userRole === 'super_admin' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'
+              } md:flex md:w-auto md:justify-start md:gap-1 md:p-1.5`}
+            >
+              <TabsTrigger
+                value="dashboard"
+                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
-                <TrendingUp className="w-4 h-4" />
-                <span className="hidden xs:inline">Dashboard</span>
-                <span className="xs:hidden">Home</span>
+                <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline md:inline">Dashboard</span>
+                <span className="xs:hidden md:hidden">Home</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="messages" 
-                className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs relative data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+              <TabsTrigger
+                value="messages"
+                className="relative flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
-                <MessageSquare className="w-4 h-4" />
-                <span className="hidden xs:inline">Messages</span>
-                <span className="xs:hidden">Chat</span>
+                <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline md:inline">Messages</span>
+                <span className="xs:hidden md:hidden">Chat</span>
                 {stats.unread_messages > 0 && (
-                  <Badge variant="secondary" className="absolute -top-0.5 -right-0.5 w-3 h-3 p-0 text-xs flex items-center justify-center">
+                  <Badge variant="secondary" className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center md:static md:ml-1">
                     {stats.unread_messages > 9 ? '9+' : stats.unread_messages}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger 
-                value="events" 
-                className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+              <TabsTrigger
+                value="events"
+                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-4 h-4 flex-shrink-0" />
                 <span>Events</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="employees" 
-                className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+              <TabsTrigger
+                value="employees"
+                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
-                <Users className="w-4 h-4" />
-                <span className="hidden xs:inline">Team</span>
-                <span className="xs:hidden">Employee</span>
+                <Users className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline md:inline">Employees</span>
+                <span className="xs:hidden md:hidden">Team</span>
               </TabsTrigger>
               {(userRole === 'super_admin' || userRole === 'admin') && (
-                <TabsTrigger 
-                  value="admin" 
-                  className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-red-50 data-[state=active]:text-red-600"
+                <TabsTrigger
+                  value="admin"
+                  className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-red-50 data-[state=active]:text-red-600"
                 >
-                  <Menu className="w-4 h-4" />
+                  <Menu className="w-4 h-4 flex-shrink-0" />
                   <span>Admin</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger 
-                value="profile" 
-                className="flex flex-col items-center space-y-0.5 py-2 sm:py-3 text-xs data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+              <TabsTrigger
+                value="profile"
+                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:ml-auto data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
               >
-                <Avatar className="w-4 h-4">
-                  <AvatarFallback className="text-xs">
+                <Avatar className="w-4 h-4 md:w-5 md:h-5">
+                  <AvatarFallback className="text-[9px] md:text-[10px]">
                     {getInitials(user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
