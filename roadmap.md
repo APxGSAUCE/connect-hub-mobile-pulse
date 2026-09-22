@@ -1,0 +1,3 @@
+- [ ] Complete portal accessibility fixes
+- [ ] Build grouped activity center
+- [ ] Validate phone, tablet, and desktop layouts
