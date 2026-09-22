@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, MessageSquare, Users, Bell, 
-  TrendingUp, Clock, CheckCircle, AlertCircle, Loader2, Menu, LogOut
+  TrendingUp, Clock, AlertCircle, Loader2, ShieldCheck
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -235,6 +235,21 @@ const Index = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const canAccessAdmin = userRole === 'super_admin' || userRole === 'admin';
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+
+    const url = new URL(window.location.href);
+    if (tab === 'dashboard') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.pushState({}, '', url.toString());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -264,12 +279,7 @@ const Index = () => {
     };
     
     if (tabMap[shortcut]) {
-      setActiveTab(tabMap[shortcut]);
-      
-      // Update URL to reflect the change
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', tabMap[shortcut]);
-      window.history.pushState({}, '', url.toString());
+      handleTabChange(tabMap[shortcut]);
       
       // Show toast for navigation feedback
       toast({
@@ -303,69 +313,79 @@ const Index = () => {
 
       {/* Main Content - Enhanced PWA responsiveness */}
       <div className="flex-1 flex flex-col overflow-hidden safe-area-left safe-area-right">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 flex flex-col">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            {/* Navigation: compact icon grid on phones, full horizontal nav bar on desktop */}
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-5 lg:py-6 pb-24 md:pb-5 lg:pb-6 flex-1 flex flex-col">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col">
+            {/* Phone: fixed bottom bar. Tablet: compact strip. Desktop: full navigation bar. */}
             <TabsList
-              className={`mb-3 sm:mb-6 h-auto bg-white rounded-lg shadow-sm border p-1 grid w-full ${
-                userRole === 'super_admin' || userRole === 'admin' ? 'grid-cols-6' : 'grid-cols-5'
-              } md:flex md:w-full md:justify-start md:gap-1 md:p-1.5`}
+              aria-label="Employee portal sections"
+              className={`fixed inset-x-0 bottom-0 z-50 h-auto rounded-none border-x-0 border-b-0 bg-background/95 p-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur grid w-full ${
+                canAccessAdmin ? 'grid-cols-6' : 'grid-cols-5'
+              } md:static md:mb-5 md:flex md:w-full md:justify-start md:gap-1 md:overflow-x-auto md:rounded-lg md:border md:p-1.5 md:pb-1.5 md:shadow-sm lg:mb-6 lg:gap-2 lg:overflow-visible lg:p-2`}
             >
               <TabsTrigger
                 value="dashboard"
-                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+                aria-label="Dashboard"
+                className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
               >
-                <TrendingUp className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline md:inline">Dashboard</span>
-                <span className="xs:hidden md:hidden">Home</span>
+                <TrendingUp className="h-5 w-5 flex-shrink-0 md:h-4 md:w-4" />
+                <span className="md:hidden">Home</span>
+                <span className="hidden md:inline">Dashboard</span>
               </TabsTrigger>
               <TabsTrigger
                 value="messages"
-                className="relative flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+                aria-label="Messages"
+                className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
               >
-                <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline md:inline">Messages</span>
-                <span className="xs:hidden md:hidden">Chat</span>
+                <MessageSquare className="h-5 w-5 flex-shrink-0 md:h-4 md:w-4" />
+                <span className="md:hidden">Chat</span>
+                <span className="hidden md:inline">Messages</span>
                 {stats.unread_messages > 0 && (
-                  <Badge variant="secondary" className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center md:static md:ml-1">
+                  <Badge variant="secondary" className="absolute right-1 top-1 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center md:static md:ml-1">
                     {stats.unread_messages > 9 ? '9+' : stats.unread_messages}
                   </Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger
                 value="events"
-                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+                aria-label="Events"
+                className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
               >
-                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <Calendar className="h-5 w-5 flex-shrink-0 md:h-4 md:w-4" />
                 <span>Events</span>
               </TabsTrigger>
               <TabsTrigger
                 value="employees"
-                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+                aria-label="Employee directory"
+                className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
               >
-                <Users className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline md:inline">Employees</span>
-                <span className="xs:hidden md:hidden">Team</span>
+                <Users className="h-5 w-5 flex-shrink-0 md:h-4 md:w-4" />
+                <span className="md:hidden">Team</span>
+                <span className="hidden md:inline lg:hidden">Employees</span>
+                <span className="hidden lg:inline">Employee Directory</span>
               </TabsTrigger>
-              {(userRole === 'super_admin' || userRole === 'admin') && (
+              {canAccessAdmin && (
                 <TabsTrigger
                   value="admin"
-                  className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm data-[state=active]:bg-red-50 data-[state=active]:text-red-600"
+                  aria-label="Administration"
+                  className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
                 >
-                  <Menu className="w-4 h-4 flex-shrink-0" />
-                  <span>Admin</span>
+                  <ShieldCheck className="h-5 w-5 flex-shrink-0 md:h-4 md:w-4" />
+                  <span className="lg:hidden">Admin</span>
+                  <span className="hidden lg:inline">Administration</span>
                 </TabsTrigger>
               )}
               <TabsTrigger
                 value="profile"
-                className="flex flex-col items-center gap-0.5 py-2 text-[11px] md:flex-row md:gap-2 md:px-4 md:py-2.5 md:text-sm md:ml-auto data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600"
+                aria-label="My profile"
+                className="relative min-w-0 flex flex-col items-center gap-1 rounded-md px-1 py-2 text-[10px] text-muted-foreground shadow-none after:absolute after:inset-x-3 after:top-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 md:ml-auto md:min-w-fit md:flex-row md:gap-2 md:px-3 md:py-2.5 md:text-sm md:after:inset-x-2 md:after:bottom-0 md:after:top-auto lg:px-5 lg:data-[state=active]:bg-primary lg:data-[state=active]:text-primary-foreground lg:data-[state=active]:shadow-sm lg:data-[state=active]:after:scale-x-0"
               >
-                <Avatar className="w-4 h-4 md:w-5 md:h-5">
-                  <AvatarFallback className="text-[9px] md:text-[10px]">
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback className="text-[9px]">
                     {getInitials(user.email || 'U')}
                   </AvatarFallback>
                 </Avatar>
-                <span>Profile</span>
+                <span className="lg:hidden">Profile</span>
+                <span className="hidden lg:inline">My Profile</span>
               </TabsTrigger>
             </TabsList>
 
