@@ -26,7 +26,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import NotFound from "./NotFound";
 import { useUserRole } from "@/hooks/useUserRole";
 import { getPortalPermissions, type AppRole, type PortalSection } from "@/lib/portalAccess";
-import { PortalPageHeader, getPortalPageTitle } from "@/components/PortalPageHeader";
+import { PortalPageHeader } from "@/components/PortalPageHeader";
 
 
 interface DashboardStats {
@@ -229,7 +229,8 @@ const Index = () => {
   const canAccessAdmin = permissions.allowedSections.includes("admin");
 
   useEffect(() => {
-    document.title = `${getPortalPageTitle(activeTab)} | PGIS Employee Portal`;
+    const titles: Record<PortalSection, string> = { dashboard: "Dashboard", messages: "Messages", events: "Events", employees: "Employee Directory", admin: "Administration", profile: "My Profile" };
+    document.title = `${titles[activeTab]} | PGIS Employee Portal`;
   }, [activeTab]);
 
   const handleTabChange = (tab: string) => {

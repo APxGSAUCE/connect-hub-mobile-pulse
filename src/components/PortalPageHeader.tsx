@@ -18,8 +18,6 @@ const PAGE_COPY: Record<PortalSection, { title: string; description: string }> =
   profile: { title: "My Profile", description: "Your account details and permissions" },
 };
 
-export const getPortalPageTitle = (section: PortalSection) => PAGE_COPY[section].title;
-
 export const PortalPageHeader = ({ section }: { section: PortalSection }) => {
   const copy = PAGE_COPY[section];
   return (

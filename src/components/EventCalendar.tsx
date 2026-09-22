@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2, UserPlus, Lock } from "lucide-react";
+import { Calendar, Plus, MapPin, Clock, Users, Edit, Trash2, Loader2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -92,7 +92,9 @@ const EventCalendar = () => {
         (eventsData || [])
           .filter(e => e.image_url)
           .map(async (e) => {
-            const signedUrl = await getSignedFileUrl(e.image_url!);
+            const imagePath = e.image_url;
+            if (!imagePath) return;
+            const signedUrl = await getSignedFileUrl(imagePath);
             if (signedUrl) urlMap[e.id] = signedUrl;
           })
       );

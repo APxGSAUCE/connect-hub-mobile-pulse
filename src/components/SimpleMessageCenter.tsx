@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Plus, Send, Users, Loader2, Search, Lock } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, Loader2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -371,7 +371,10 @@ const SimpleMessageCenter = () => {
     const groupId = searchParams.get("groupId");
     if (!groupId || groups.length === 0) return;
     const target = groups.find((group) => group.id === groupId);
-    if (target && selectedGroup?.id !== target.id) handleGroupSelect(target);
+    if (target && selectedGroup?.id !== target.id) {
+      setSelectedGroup(target);
+      fetchMessages(target.id);
+    }
   }, [groups, searchParams, selectedGroup?.id]);
 
   useEffect(() => {
@@ -814,7 +817,7 @@ const SimpleMessageCenter = () => {
                           <div
                             key={message.id}
                             id={`message-${message.id}`}
-                            className={`flex ${
+                            className={`flex ${searchParams.get("messageId") === message.id ? "rounded-md ring-2 ring-ring" : ""} ${
                               message.sender_id === user?.id ? 'justify-end' : 'justify-start'
                             }`}
                           >

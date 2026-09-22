@@ -11,6 +11,10 @@ import type { PortalPermissions } from "@/lib/portalAccess";
 type SearchKind = "message" | "event" | "employee" | "task" | "file";
 type SearchFilter = "all" | SearchKind;
 type SearchResult = { id: string; kind: SearchKind; title: string; description: string; url: string };
+type MessageResult = { id: string; group_id: string; content: string; file_name: string | null; file_url: string | null };
+type EventResult = { id: string; title: string; location: string | null; event_type: string };
+type EmployeeResult = { id: string; first_name: string | null; last_name: string | null; position: string | null; email?: string | null };
+type TaskResult = { id: string; title: string; message: string };
 
 const filters: Array<{ value: SearchFilter; label: string }> = [
   { value: "all", label: "All" }, { value: "message", label: "Messages" },
@@ -71,12 +75,13 @@ export const GlobalSearch = ({ permissions }: { permissions: PortalPermissions }
       const failed = [messages, events, employees, tasks].find((result) => result.error);
       if (failed?.error) throw failed.error;
       const q = clean.toLowerCase();
-      const employeeRows = (employees.data || []).filter((person: any) => `${person.first_name || ""} ${person.last_name || ""} ${person.position || ""} ${person.email || ""}`.toLowerCase().includes(q)).slice(0, 12);
+      const employeeRows = (employees.data || []) as EmployeeResult[];
+      const matchingEmployees = employeeRows.filter((person) => `${person.first_name || ""} ${person.last_name || ""} ${person.position || ""} ${person.email || ""}`.toLowerCase().includes(q)).slice(0, 12);
       setResults([
-        ...(messages.data || []).map((message: any) => ({ id: message.id, kind: message.file_url ? "file" as const : "message" as const, title: message.file_url ? message.file_name || "Shared file" : message.content, description: message.file_url ? message.content || "Shared in a conversation" : "Message", url: `/messages?groupId=${message.group_id}&messageId=${message.id}` })),
-        ...(events.data || []).map((event: any) => ({ id: event.id, kind: "event" as const, title: event.title, description: `${event.event_type}${event.location ? ` · ${event.location}` : ""}`, url: `/events?eventId=${event.id}` })),
-        ...employeeRows.map((person: any) => ({ id: person.id, kind: "employee" as const, title: `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Employee", description: person.position || "Employee", url: `/employees?employeeId=${person.id}` })),
-        ...(tasks.data || []).map((task: any) => ({ id: task.id, kind: "task" as const, title: task.title, description: task.message, url: `/?activity=task&notificationId=${task.id}` })),
+        ...((messages.data || []) as MessageResult[]).map((message) => ({ id: message.id, kind: message.file_url ? "file" as const : "message" as const, title: message.file_url ? message.file_name || "Shared file" : message.content, description: message.file_url ? message.content || "Shared in a conversation" : "Message", url: `/messages?groupId=${message.group_id}&messageId=${message.id}` })),
+        ...((events.data || []) as EventResult[]).map((event) => ({ id: event.id, kind: "event" as const, title: event.title, description: `${event.event_type}${event.location ? ` · ${event.location}` : ""}`, url: `/events?eventId=${event.id}` })),
+        ...matchingEmployees.map((person) => ({ id: person.id, kind: "employee" as const, title: `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Employee", description: person.position || "Employee", url: `/employees?employeeId=${person.id}` })),
+        ...((tasks.data || []) as TaskResult[]).map((task) => ({ id: task.id, kind: "task" as const, title: task.title, description: task.message, url: `/?activity=task&notificationId=${task.id}` })),
       ]);
     } catch (searchError) {
       console.error("Global search failed:", searchError);
