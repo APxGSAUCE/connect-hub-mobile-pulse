@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Plus, Send, Users, Loader2, Search, Lock } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, Loader2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,6 +68,7 @@ interface Department {
 }
 
 const SimpleMessageCenter = () => {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const { userRole, loading: roleLoading } = useUserRole();
@@ -365,6 +367,22 @@ const SimpleMessageCenter = () => {
     }
   }, [user, userRole]);
 
+  useEffect(() => {
+    const groupId = searchParams.get("groupId");
+    if (!groupId || groups.length === 0) return;
+    const target = groups.find((group) => group.id === groupId);
+    if (target && selectedGroup?.id !== target.id) {
+      setSelectedGroup(target);
+      fetchMessages(target.id);
+    }
+  }, [groups, searchParams, selectedGroup?.id]);
+
+  useEffect(() => {
+    const messageId = searchParams.get("messageId");
+    if (!messageId || messagesLoading) return;
+    window.requestAnimationFrame(() => document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [messages, messagesLoading, searchParams]);
+
   // Set up real-time subscriptions
   useRealtimeSubscription('messages', () => {
     if (selectedGroup) {
@@ -579,23 +597,11 @@ const SimpleMessageCenter = () => {
           <p className="text-sm text-gray-600">Connect with your team</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        {userRole?.can_create_messages && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
-              className="w-full sm:w-auto" 
-              disabled={!userRole?.can_create_messages}
-            >
-              {userRole?.can_create_messages ? (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Chat
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4 mr-2" />
-                  Cannot Create Chats
-                </>
-              )}
+            <Button className="w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              New Chat
             </Button>
           </DialogTrigger>
           <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
@@ -661,7 +667,7 @@ const SimpleMessageCenter = () => {
               </div>
             </div>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
 
         {/* Create Group Dialog */}
         <CreateGroupDialog
@@ -759,10 +765,10 @@ const SimpleMessageCenter = () => {
                     <p className="text-sm text-gray-600 mb-4">
                       {searchTerm ? 'Try adjusting your search' : 'Start a conversation with your team'}
                     </p>
-                    <Button onClick={() => setIsDialogOpen(true)} size="sm">
+                    {userRole?.can_create_messages && <Button onClick={() => setIsDialogOpen(true)} size="sm">
                       <Plus className="w-4 h-4 mr-2" />
                       New Chat
-                    </Button>
+                    </Button>}
                   </div>
                 )}
               </ScrollArea>
@@ -810,7 +816,8 @@ const SimpleMessageCenter = () => {
                         {messages.map((message) => (
                           <div
                             key={message.id}
-                            className={`flex ${
+                            id={`message-${message.id}`}
+                            className={`flex ${searchParams.get("messageId") === message.id ? "rounded-md ring-2 ring-ring" : ""} ${
                               message.sender_id === user?.id ? 'justify-end' : 'justify-start'
                             }`}
                           >

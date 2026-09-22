@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +31,7 @@ interface Department {
 }
 
 const EmployeeManagement = () => {
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const { userRole, loading: roleLoading } = useUserRole();
@@ -122,6 +124,12 @@ const EmployeeManagement = () => {
       fetchDepartments();
     }
   }, [roleLoading, userRole]);
+
+  useEffect(() => {
+    const employeeId = searchParams.get("employeeId");
+    if (!employeeId || loading) return;
+    window.requestAnimationFrame(() => document.getElementById(`employee-${employeeId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [loading, searchParams]);
 
   // Set up real-time subscriptions
   useRealtimeSubscription('profiles', fetchEmployees, [userRole]);
@@ -223,14 +231,6 @@ const EmployeeManagement = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
-          <p className="text-gray-600">Manage your team members</p>
-        </div>
-      </div>
-
       {/* Access request status for employees awaiting approval */}
       <AccessRequestCard onSubmitted={fetchEmployees} />
 

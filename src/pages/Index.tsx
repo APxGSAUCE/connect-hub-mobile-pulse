@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, MessageSquare, Users, Bell, 
-  TrendingUp, Clock, AlertCircle, Loader2, ShieldCheck
+  TrendingUp, Clock, AlertCircle, Loader2, ShieldCheck, ShieldX
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,9 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import AdminDashboard from "@/components/AdminDashboard";
 import NotFound from "./NotFound";
+import { useUserRole } from "@/hooks/useUserRole";
+import { getPortalPermissions, type AppRole, type PortalSection } from "@/lib/portalAccess";
+import { PortalPageHeader } from "@/components/PortalPageHeader";
 
 
 interface DashboardStats {
@@ -56,26 +59,26 @@ interface RecentEvent {
 
 const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
+  const { userRole: roleDetails, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const VALID_TABS = ["dashboard", "messages", "events", "employees", "admin", "profile"];
+  const VALID_TABS: PortalSection[] = ["dashboard", "messages", "events", "employees", "admin", "profile"];
   // A section can be addressed directly (/messages) or via ?tab=messages (legacy links).
   const pathSection = location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
   const legacyTab = searchParams.get("tab")?.toLowerCase();
-  const requestedTab = VALID_TABS.includes(pathSection)
+  const requestedTab = VALID_TABS.includes(pathSection as PortalSection)
     ? pathSection
     : (legacyTab || "dashboard");
-  const activeTab = VALID_TABS.includes(requestedTab) ? requestedTab : "dashboard";
-  const hasInvalidLegacyTab = location.pathname === "/" && Boolean(legacyTab) && !VALID_TABS.includes(legacyTab || "");
+  const activeTab: PortalSection = VALID_TABS.includes(requestedTab as PortalSection) ? requestedTab as PortalSection : "dashboard";
+  const hasInvalidLegacyTab = location.pathname === "/" && Boolean(legacyTab) && !VALID_TABS.includes((legacyTab || "") as PortalSection);
   const setActiveTab = (tab: string) => {
     const target = tab === "dashboard" ? "/" : `/${tab}`;
     if (target !== location.pathname) {
       navigate(target);
     }
   };
-  const [userRole, setUserRole] = useState<string>('');
   const [stats, setStats] = useState<DashboardStats>({
     total_messages: 0,
     unread_messages: 0,
@@ -196,31 +199,9 @@ const Index = () => {
 
   useEffect(() => {
     if (user && !authLoading) {
-      fetchUserRole();
       fetchDashboardData();
     }
   }, [user, authLoading, fetchDashboardData]);
-
-  const fetchUserRole = async () => {
-    if (!user) return;
-    
-    try {
-      // Fetch role from user_roles table (proper security pattern)
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .order('role', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (error) throw error;
-      setUserRole(data?.role || 'employee');
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-      setUserRole('employee');
-    }
-  };
 
   // Initialize real-time notifications
   useRealtimeNotifications({ 
@@ -237,7 +218,6 @@ const Index = () => {
   useRealtimeSubscription('messages', fetchDashboardData, [user]);
   useRealtimeSubscription('notifications', fetchDashboardData, [user]);
   useRealtimeSubscription('profiles', () => {
-    fetchUserRole();
     fetchDashboardData();
   }, [user]);
 
@@ -245,7 +225,13 @@ const Index = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const canAccessAdmin = userRole === 'super_admin' || userRole === 'admin';
+  const permissions = getPortalPermissions((roleDetails?.role || "employee") as AppRole, roleDetails?.is_department_head);
+  const canAccessAdmin = permissions.allowedSections.includes("admin");
+
+  useEffect(() => {
+    const titles: Record<PortalSection, string> = { dashboard: "Dashboard", messages: "Messages", events: "Events", employees: "Employee Directory", admin: "Administration", profile: "My Profile" };
+    document.title = `${titles[activeTab]} | PGIS Employee Portal`;
+  }, [activeTab]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -294,7 +280,7 @@ const Index = () => {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-dvh bg-background flex items-center justify-center safe-area-inset" role="status">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -311,6 +297,19 @@ const Index = () => {
     return <NotFound />;
   }
 
+  if (!permissions.allowedSections.includes(activeTab)) {
+    return (
+      <div className="min-h-dvh bg-background flex items-center justify-center p-4">
+        <div className="max-w-md text-center">
+          <ShieldX className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h1 className="text-2xl font-bold">This section is restricted</h1>
+          <p className="mt-2 text-muted-foreground">Your account does not have permission to open this portal section.</p>
+          <Button className="mt-6" onClick={() => navigate("/", { replace: true })}>Return to Dashboard</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-background flex flex-col ios-fix">
       <a href="#portal-main" className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-md bg-primary px-4 py-2 text-primary-foreground shadow-lg transition-transform focus:translate-y-0">
@@ -320,6 +319,7 @@ const Index = () => {
         unreadNotifications={stats.unread_notifications}
         onNotificationCountChange={(count) => setStats(prev => ({ ...prev, unread_notifications: count }))}
         onNavigate={handleTabChange}
+        permissions={permissions}
       />
 
       {/* Main Content - Enhanced PWA responsiveness */}
@@ -399,6 +399,8 @@ const Index = () => {
                 <span className="hidden lg:inline">My Profile</span>
               </TabsTrigger>
             </TabsList>
+
+            <PortalPageHeader section={activeTab} />
 
             <div className="flex-1 overflow-hidden">
               <TabsContent value="dashboard" className="space-y-3 sm:space-y-6 h-full overflow-y-auto">

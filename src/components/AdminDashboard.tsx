@@ -16,6 +16,7 @@ import { AdminAccountSettings } from '@/components/admin/AdminAccountSettings';
 import { RoleChangeRequests } from '@/components/admin/RoleChangeRequests';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Database } from '@/integrations/supabase/types';
+import { useUserRole } from '@/hooks/useUserRole';
 
 type AppRole = Database['public']['Enums']['app_role'];
 type Section = 'overview' | 'invite' | 'users' | 'departments' | 'approvals' | 'settings';
@@ -31,31 +32,22 @@ const navItems: { key: Section; label: string; icon: React.ElementType; descript
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
+  const { userRole: roleDetails, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const [section, setSection] = useState<Section>('overview');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [departmentCount, setDepartmentCount] = useState(0);
-  const [userRole, setUserRole] = useState<AppRole>('employee');
   const [loading, setLoading] = useState(true);
 
   const fetchAll = async () => {
     setLoading(true);
-    const [roleRes, profileRes, deptRes] = await Promise.all([
-      supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id ?? '')
-        .order('role', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+    const [profileRes, deptRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('id, email, first_name, last_name, role, status, approval_status, department_id, position')
         .order('created_at', { ascending: false }),
       supabase.from('departments').select('id', { count: 'exact', head: true }),
     ]);
-
-    setUserRole(roleRes.data?.role || 'employee');
 
     if (profileRes.error) {
       toast({ title: 'Error', description: 'Could not load employees.', variant: 'destructive' });
@@ -80,9 +72,10 @@ export const AdminDashboard = () => {
     return { pending, approved, rejected, admins, deptHeads, total: users.length };
   }, [users]);
 
+  const userRole = (roleDetails?.role || 'employee') as AppRole;
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

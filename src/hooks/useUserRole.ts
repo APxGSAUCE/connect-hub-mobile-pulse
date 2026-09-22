@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getPortalPermissions, type AppRole } from '@/lib/portalAccess';
 
 export interface UserRole {
   role: string;
@@ -62,18 +63,19 @@ export const useUserRole = () => {
         isDepartmentHead = deptData?.head_user_id === user.id;
       }
 
-      const role = roleData?.role || 'employee';
+      const role = (roleData?.role || 'employee') as AppRole;
+      const permissions = getPortalPermissions(role, isDepartmentHead);
 
-      const permissions: UserRole = {
+      const nextRole: UserRole = {
         role,
         department_id: profileData?.department_id || null,
-        is_department_head: isDepartmentHead,
-        can_create_messages: ['super_admin', 'admin'].includes(role) || isDepartmentHead,
-        can_create_events: ['super_admin', 'admin'].includes(role) || isDepartmentHead,
-        can_manage_users: ['super_admin', 'admin'].includes(role)
+        is_department_head: permissions.isManager,
+        can_create_messages: permissions.canCreateMessages,
+        can_create_events: permissions.canCreateEvents,
+        can_manage_users: permissions.canManageUsers
       };
 
-      setUserRole(permissions);
+      setUserRole(nextRole);
     } catch (error) {
       console.error('Error fetching user role:', error);
       // Default to basic employee permissions on error

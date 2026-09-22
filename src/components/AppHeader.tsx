@@ -3,15 +3,18 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { useToast } from "@/hooks/use-toast";
+import type { PortalPermissions } from "@/lib/portalAccess";
 
 interface AppHeaderProps {
   unreadNotifications: number;
   onNotificationCountChange: (count: number) => void;
   onNavigate: (section: "messages" | "events" | "employees" | "admin") => void;
+  permissions: PortalPermissions;
 }
 
-export const AppHeader = ({ unreadNotifications, onNotificationCountChange, onNavigate }: AppHeaderProps) => {
+export const AppHeader = ({ unreadNotifications, onNotificationCountChange, onNavigate, permissions }: AppHeaderProps) => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
 
@@ -56,6 +59,7 @@ export const AppHeader = ({ unreadNotifications, onNotificationCountChange, onNa
           
           {/* Right side - Notifications, Profile and Sign Out */}
           <div className="header-actions">
+            <GlobalSearch permissions={permissions} />
             <NotificationCenter 
               unreadCount={unreadNotifications} 
               onCountChange={onNotificationCountChange}

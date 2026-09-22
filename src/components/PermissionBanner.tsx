@@ -98,7 +98,7 @@ export const PermissionMatrix: React.FC<{ userRole: UserRole }> = ({ userRole })
           <Badge variant="outline" className="ml-auto">
             {userRole.role === 'super_admin' ? 'Super Admin' : 
              userRole.role === 'admin' ? 'Admin' : 
-             userRole.is_department_head ? 'Department Head' : 'Employee'}
+               userRole.role === 'dept_head' || userRole.is_department_head ? 'Department Head' : 'Employee'}
           </Badge>
         </div>
         <div className="space-y-3">

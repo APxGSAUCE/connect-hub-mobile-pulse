@@ -4,3 +4,7 @@
 - [x] Add branded invalid-link recovery page
 - [x] Add safe aliases for outdated portal URLs
 - [x] Verify direct, refreshed, and back/forward section navigation
+- [x] Centralize role-based section and action access
+- [x] Add global search with filters and deep links
+- [x] Add responsive page titles and breadcrumbs
+- [x] Verify routes, types, and responsive behavior
