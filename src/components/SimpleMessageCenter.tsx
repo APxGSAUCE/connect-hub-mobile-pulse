@@ -374,6 +374,12 @@ const SimpleMessageCenter = () => {
     if (target && selectedGroup?.id !== target.id) handleGroupSelect(target);
   }, [groups, searchParams, selectedGroup?.id]);
 
+  useEffect(() => {
+    const messageId = searchParams.get("messageId");
+    if (!messageId || messagesLoading) return;
+    window.requestAnimationFrame(() => document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [messages, messagesLoading, searchParams]);
+
   // Set up real-time subscriptions
   useRealtimeSubscription('messages', () => {
     if (selectedGroup) {

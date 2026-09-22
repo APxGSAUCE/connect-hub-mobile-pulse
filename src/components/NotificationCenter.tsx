@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, Bell, Calendar, Check, CheckCircle2, FileText, Loader2, MessageSquare, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ const FILTERS: Array<{ value: ActivityFilter; label: string }> = [
 ];
 
 export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: NotificationCenterProps) => {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<ActivityItem[]>([]);
@@ -120,6 +122,12 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   }, [onCountChange, toast, user]);
 
   useEffect(() => { fetchActivity(); }, [fetchActivity]);
+  useEffect(() => {
+    const activity = searchParams.get("activity");
+    if (!activity || !["message", "event", "task", "file"].includes(activity)) return;
+    setFilter(activity as ActivityKind);
+    setIsOpen(true);
+  }, [searchParams]);
   useRealtimeSubscription("messages", fetchActivity, [user]);
   useRealtimeSubscription("events", fetchActivity, [user]);
   useRealtimeSubscription("notifications", fetchActivity, [user]);

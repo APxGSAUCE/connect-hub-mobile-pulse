@@ -51,7 +51,7 @@ export const GlobalSearch = ({ permissions }: { permissions: PortalPermissions }
     if (clean.length < 2) { setResults([]); setError(false); return; }
     setLoading(true); setError(false);
     try {
-      const pattern = `%${clean.replace(/[%_]/g, "")} %`.replace(" %", "%");
+      const pattern = `%${clean.replace(/[%_]/g, "")}%`;
       const memberships = await supabase.from("chat_group_members").select("group_id");
       if (memberships.error) throw memberships.error;
       const groupIds = (memberships.data || []).map((row) => row.group_id);
@@ -76,7 +76,7 @@ export const GlobalSearch = ({ permissions }: { permissions: PortalPermissions }
         ...(messages.data || []).map((message: any) => ({ id: message.id, kind: message.file_url ? "file" as const : "message" as const, title: message.file_url ? message.file_name || "Shared file" : message.content, description: message.file_url ? message.content || "Shared in a conversation" : "Message", url: `/messages?groupId=${message.group_id}&messageId=${message.id}` })),
         ...(events.data || []).map((event: any) => ({ id: event.id, kind: "event" as const, title: event.title, description: `${event.event_type}${event.location ? ` · ${event.location}` : ""}`, url: `/events?eventId=${event.id}` })),
         ...employeeRows.map((person: any) => ({ id: person.id, kind: "employee" as const, title: `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Employee", description: person.position || "Employee", url: `/employees?employeeId=${person.id}` })),
-        ...(tasks.data || []).map((task: any) => ({ id: task.id, kind: "task" as const, title: task.title, description: task.message, url: `/employees?taskId=${task.id}` })),
+        ...(tasks.data || []).map((task: any) => ({ id: task.id, kind: "task" as const, title: task.title, description: task.message, url: `/?activity=task&notificationId=${task.id}` })),
       ]);
     } catch (searchError) {
       console.error("Global search failed:", searchError);
