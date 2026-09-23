@@ -47,10 +47,15 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const hasLoaded = useRef(false);
+  // Keep the latest parent callback in a ref so an inline arrow in Index.tsx
+  // cannot change fetchActivity's identity and retrigger the effect loop.
+  const onCountChangeRef = useRef(onCountChange);
+  onCountChangeRef.current = onCountChange;
 
   const fetchActivity = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
 
     try {
       const [notificationsResult, eventsResult, membershipsResult] = await Promise.all([
@@ -112,14 +117,15 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       const nextItems = [...notificationItems, ...messageItems, ...eventItems]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setItems(nextItems);
-      onCountChange(nextItems.filter((item) => item.unread).length);
+      onCountChangeRef.current(nextItems.filter((item) => item.unread).length);
     } catch (error) {
       console.error("Error fetching activity:", error);
       toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
     } finally {
+      hasLoaded.current = true;
       setLoading(false);
     }
-  }, [onCountChange, toast, user]);
+  }, [toast, user]);
 
   useEffect(() => { fetchActivity(); }, [fetchActivity]);
   useEffect(() => {
