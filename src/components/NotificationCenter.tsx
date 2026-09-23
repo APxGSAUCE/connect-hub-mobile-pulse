@@ -122,9 +122,10 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       console.error("Error fetching activity:", error);
       toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
     } finally {
+      hasLoaded.current = true;
       setLoading(false);
     }
-  }, [onCountChange, toast, user]);
+  }, [toast, user]);
 
   useEffect(() => { fetchActivity(); }, [fetchActivity]);
   useEffect(() => {
