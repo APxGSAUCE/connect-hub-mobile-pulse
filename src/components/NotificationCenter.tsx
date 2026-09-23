@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 
 type ActivityKind = "message" | "event" | "task" | "file";
 type ActivityFilter = "all" | ActivityKind;
