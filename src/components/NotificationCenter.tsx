@@ -42,6 +42,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { allowsKind } = useNotificationPreferences();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
