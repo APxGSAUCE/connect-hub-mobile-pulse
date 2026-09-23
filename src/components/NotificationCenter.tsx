@@ -117,7 +117,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       const nextItems = [...notificationItems, ...messageItems, ...eventItems]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setItems(nextItems);
-      onCountChange(nextItems.filter((item) => item.unread).length);
+      onCountChangeRef.current(nextItems.filter((item) => item.unread).length);
     } catch (error) {
       console.error("Error fetching activity:", error);
       toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
