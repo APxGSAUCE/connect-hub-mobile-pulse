@@ -305,6 +305,53 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          deliver_email_digest: boolean
+          deliver_in_app: boolean
+          deliver_toast: boolean
+          show_events: boolean
+          show_files: boolean
+          show_messages: boolean
+          show_tasks: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deliver_email_digest?: boolean
+          deliver_in_app?: boolean
+          deliver_toast?: boolean
+          show_events?: boolean
+          show_files?: boolean
+          show_messages?: boolean
+          show_tasks?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deliver_email_digest?: boolean
+          deliver_in_app?: boolean
+          deliver_toast?: boolean
+          show_events?: boolean
+          show_files?: boolean
+          show_messages?: boolean
+          show_tasks?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null

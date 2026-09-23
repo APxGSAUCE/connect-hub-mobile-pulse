@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 
 type ActivityKind = "message" | "event" | "task" | "file";
 type ActivityFilter = "all" | ActivityKind;
@@ -42,6 +43,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { allowsKind } = useNotificationPreferences();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
@@ -128,7 +130,6 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       setErrorMessage(null);
       errorNotified.current = false;
       setLastUpdated(new Date());
-      onCountChangeRef.current(nextItems.filter((item) => item.unread).length);
     } catch (error) {
       console.error("Error fetching activity:", error);
       setErrorMessage("Could not load the latest activity.");
@@ -154,7 +155,12 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   useRealtimeSubscription("events", fetchActivity, [user]);
   useRealtimeSubscription("notifications", fetchActivity, [user]);
 
-  const visibleItems = useMemo(() => filter === "all" ? items : items.filter((item) => item.kind === filter), [filter, items]);
+  const allowedItems = useMemo(() => items.filter((item) => allowsKind(item.kind)), [items, allowsKind]);
+  const availableFilters = useMemo(() => FILTERS.filter((option) => option.value === "all" || allowsKind(option.value)), [allowsKind]);
+  useEffect(() => {
+    if (filter !== "all" && !allowsKind(filter)) setFilter("all");
+  }, [allowsKind, filter]);
+  const visibleItems = useMemo(() => filter === "all" ? allowedItems : allowedItems.filter((item) => item.kind === filter), [filter, allowedItems]);
   const groupedItems = useMemo(() => {
     const order: ActivityKind[] = ["message", "event", "task", "file"];
     return order
@@ -165,7 +171,10 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       }))
       .filter((group) => group.items.length > 0);
   }, [visibleItems]);
-  const countFor = (kind: ActivityFilter) => kind === "all" ? items.length : items.filter((item) => item.kind === kind).length;
+  const countFor = (kind: ActivityFilter) => kind === "all" ? allowedItems.length : allowedItems.filter((item) => item.kind === kind).length;
+  useEffect(() => {
+    onCountChangeRef.current(allowedItems.filter((item) => item.unread).length);
+  }, [allowedItems]);
 
   const markAsRead = async (item: ActivityItem) => {
     if (!user || !item.unread) return;
@@ -248,7 +257,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
           </div>
           {errorMessage && <p role="alert" className="text-sm text-destructive">{errorMessage}</p>}
           <div className="flex gap-1 overflow-x-auto pb-1" aria-label="Filter activity">
-            {FILTERS.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
+            {availableFilters.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
           </div>
           {unreadCount > 0 && <Button variant="outline" size="sm" onClick={markAllAsRead} className="min-h-11 self-start"><CheckCircle2 aria-hidden="true" />Mark all read</Button>}
         </SheetHeader>

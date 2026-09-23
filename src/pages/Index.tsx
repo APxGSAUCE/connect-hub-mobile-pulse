@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import SimpleMessageCenter from "@/components/SimpleMessageCenter";
 import EventCalendar from "@/components/EventCalendar";
 import ProfileMenu from "@/components/ProfileMenu";
+import NotificationPreferencesCard from "@/components/NotificationPreferencesCard";
 import EmployeeManagement from "@/components/EmployeeManagement";
 import { AppHeader } from "@/components/AppHeader";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
@@ -589,7 +590,12 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="profile" className="h-full overflow-y-auto">
-                <ProfileMenu />
+                <div className="space-y-6">
+                  <ProfileMenu />
+                  <div className="max-w-2xl mx-auto w-full">
+                    <NotificationPreferencesCard />
+                  </div>
+                </div>
               </TabsContent>
             </div>
           </Tabs>

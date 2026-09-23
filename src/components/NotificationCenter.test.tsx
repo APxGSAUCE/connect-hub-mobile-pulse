@@ -45,7 +45,7 @@ const makeQuery = (table: string) => {
     then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
       new Promise(settle).then(onFulfilled, onRejected),
   };
-  for (const method of ["select", "eq", "neq", "order", "limit", "in", "update", "not", "gte", "lte", "or", "is"]) {
+  for (const method of ["select", "eq", "neq", "order", "limit", "in", "update", "not", "gte", "lte", "or", "is", "maybeSingle", "single", "upsert"]) {
     query[method] = () => query;
   }
   return query;
