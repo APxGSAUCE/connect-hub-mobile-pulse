@@ -27,7 +27,6 @@ export default defineConfig(({ mode }) => ({
       "react-dom/client",
       "react/jsx-runtime",
       "react-router-dom",
-      "@tanstack/react-query",
       "@supabase/supabase-js",
     ],
   },
