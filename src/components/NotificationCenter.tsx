@@ -47,10 +47,15 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const hasLoaded = useRef(false);
+  // Keep the latest parent callback in a ref so an inline arrow in Index.tsx
+  // cannot change fetchActivity's identity and retrigger the effect loop.
+  const onCountChangeRef = useRef(onCountChange);
+  onCountChangeRef.current = onCountChange;
 
   const fetchActivity = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
 
     try {
       const [notificationsResult, eventsResult, membershipsResult] = await Promise.all([
