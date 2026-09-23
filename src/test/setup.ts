@@ -14,6 +14,15 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+if (!("ResizeObserver" in window)) {
+  (window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  globalThis.ResizeObserver = (window as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver;
+}
+
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
