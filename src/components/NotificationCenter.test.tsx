@@ -61,8 +61,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+const stableUser = { id: "user-1" };
+const stableAuth = { user: stableUser };
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "user-1" } }),
+  useAuth: () => stableAuth,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
