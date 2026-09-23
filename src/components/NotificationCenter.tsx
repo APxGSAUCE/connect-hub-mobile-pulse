@@ -130,7 +130,6 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       setErrorMessage(null);
       errorNotified.current = false;
       setLastUpdated(new Date());
-      onCountChangeRef.current(nextItems.filter((item) => item.unread).length);
     } catch (error) {
       console.error("Error fetching activity:", error);
       setErrorMessage("Could not load the latest activity.");
