@@ -257,7 +257,7 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
           </div>
           {errorMessage && <p role="alert" className="text-sm text-destructive">{errorMessage}</p>}
           <div className="flex gap-1 overflow-x-auto pb-1" aria-label="Filter activity">
-            {FILTERS.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
+            {availableFilters.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
           </div>
           {unreadCount > 0 && <Button variant="outline" size="sm" onClick={markAllAsRead} className="min-h-11 self-start"><CheckCircle2 aria-hidden="true" />Mark all read</Button>}
         </SheetHeader>
