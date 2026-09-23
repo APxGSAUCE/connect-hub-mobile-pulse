@@ -171,7 +171,10 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       }))
       .filter((group) => group.items.length > 0);
   }, [visibleItems]);
-  const countFor = (kind: ActivityFilter) => kind === "all" ? items.length : items.filter((item) => item.kind === kind).length;
+  const countFor = (kind: ActivityFilter) => kind === "all" ? allowedItems.length : allowedItems.filter((item) => item.kind === kind).length;
+  useEffect(() => {
+    onCountChangeRef.current(allowedItems.filter((item) => item.unread).length);
+  }, [allowedItems]);
 
   const markAsRead = async (item: ActivityItem) => {
     if (!user || !item.unread) return;
