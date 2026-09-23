@@ -589,7 +589,12 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="profile" className="h-full overflow-y-auto">
-                <ProfileMenu />
+                <div className="space-y-6">
+                  <ProfileMenu />
+                  <div className="max-w-2xl mx-auto w-full">
+                    <NotificationPreferencesCard />
+                  </div>
+                </div>
               </TabsContent>
             </div>
           </Tabs>
