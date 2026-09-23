@@ -46,8 +46,13 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<ActivityFilter>("all");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const hasLoaded = useRef(false);
+  // Guards against duplicate concurrent fetches and repeated error toasts.
+  const inFlight = useRef(false);
+  const errorNotified = useRef(false);
   // Keep the latest parent callback in a ref so an inline arrow in Index.tsx
   // cannot change fetchActivity's identity and retrigger the effect loop.
   const onCountChangeRef = useRef(onCountChange);
@@ -55,7 +60,10 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
 
   const fetchActivity = useCallback(async () => {
     if (!user) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     if (!hasLoaded.current) setLoading(true);
+
 
     try {
       const [notificationsResult, eventsResult, membershipsResult] = await Promise.all([
@@ -117,12 +125,20 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
       const nextItems = [...notificationItems, ...messageItems, ...eventItems]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setItems(nextItems);
+      setErrorMessage(null);
+      errorNotified.current = false;
+      setLastUpdated(new Date());
       onCountChangeRef.current(nextItems.filter((item) => item.unread).length);
     } catch (error) {
       console.error("Error fetching activity:", error);
-      toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
+      setErrorMessage("Could not load the latest activity.");
+      if (!errorNotified.current) {
+        errorNotified.current = true;
+        toast({ title: "Activity unavailable", description: "Could not load the latest activity.", variant: "destructive" });
+      }
     } finally {
       hasLoaded.current = true;
+      inFlight.current = false;
       setLoading(false);
     }
   }, [toast, user]);
@@ -224,9 +240,13 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
             <div className="min-w-0 flex-1">
               <SheetTitle>Activity Center</SheetTitle>
               <p className="text-sm text-muted-foreground" aria-live="polite">{unreadCount} unread item{unreadCount === 1 ? "" : "s"}</p>
+              <p className="text-xs text-muted-foreground" aria-live="polite" data-testid="activity-last-updated">
+                {lastUpdated ? `Last updated ${lastUpdated.toLocaleTimeString()}` : "Not updated yet"}
+              </p>
             </div>
-            <Button variant="ghost" size="icon" onClick={fetchActivity} className="min-h-11 min-w-11" aria-label="Refresh activity"><RefreshCw aria-hidden="true" className={loading ? "animate-spin" : ""} /></Button>
+            <Button variant="ghost" size="icon" onClick={() => fetchActivity()} className="min-h-11 min-w-11" aria-label="Refresh activity"><RefreshCw aria-hidden="true" className={loading ? "animate-spin" : ""} /></Button>
           </div>
+          {errorMessage && <p role="alert" className="text-sm text-destructive">{errorMessage}</p>}
           <div className="flex gap-1 overflow-x-auto pb-1" aria-label="Filter activity">
             {FILTERS.map((option) => <Button key={option.value} type="button" size="sm" variant={filter === option.value ? "secondary" : "ghost"} aria-pressed={filter === option.value} onClick={() => setFilter(option.value)} className="min-h-11 flex-none">{option.label}<Badge variant="outline">{countFor(option.value)}</Badge></Button>)}
           </div>
