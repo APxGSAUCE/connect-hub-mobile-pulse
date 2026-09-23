@@ -39,7 +39,7 @@ export const useNotificationPreferences = () => {
       .maybeSingle();
 
     if (error) console.error("Error loading notification preferences:", error);
-    if (data) setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...data });
+    if (data && !Array.isArray(data)) setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...data });
     setLoading(false);
   }, [userId]);
 
