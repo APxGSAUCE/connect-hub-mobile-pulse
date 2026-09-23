@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { realtimeService } from "@/services/realtimeService";
@@ -14,20 +13,6 @@ import ResetPassword from "./pages/ResetPassword";
 import PasswordPolicy from "./pages/PasswordPolicy";
 import AccessStatus from "./pages/AccessStatus";
 import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
-    },
-    mutations: {
-      retry: 1,
-    },
-  },
-});
 
 const LegacyPortalRedirect: React.FC<{ to: string }> = ({ to }) => {
   const location = useLocation();
@@ -47,40 +32,38 @@ const AppWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppWrapper>
-            <TooltipProvider>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/password-policy" element={<PasswordPolicy />} />
-                <Route path="/access-status" element={<AccessStatus />} />
-                <Route path="/" element={<Index />} />
-                <Route path="/dashboard" element={<Index />} />
-                <Route path="/messages" element={<Index />} />
-                <Route path="/events" element={<Index />} />
-                <Route path="/employees" element={<Index />} />
-                <Route path="/admin" element={<Index />} />
-                <Route path="/profile" element={<Index />} />
-                <Route path="/home" element={<LegacyPortalRedirect to="/" />} />
-                <Route path="/chat" element={<LegacyPortalRedirect to="/messages" />} />
-                <Route path="/calendar" element={<LegacyPortalRedirect to="/events" />} />
-                <Route path="/team" element={<LegacyPortalRedirect to="/employees" />} />
-                <Route path="/directory" element={<LegacyPortalRedirect to="/employees" />} />
-                <Route path="/account" element={<LegacyPortalRedirect to="/profile" />} />
-                <Route path="/settings" element={<LegacyPortalRedirect to="/profile" />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-              <Sonner />
-            </TooltipProvider>
-          </AppWrapper>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppWrapper>
+          <TooltipProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/password-policy" element={<PasswordPolicy />} />
+              <Route path="/access-status" element={<AccessStatus />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Index />} />
+              <Route path="/messages" element={<Index />} />
+              <Route path="/events" element={<Index />} />
+              <Route path="/employees" element={<Index />} />
+              <Route path="/admin" element={<Index />} />
+              <Route path="/profile" element={<Index />} />
+              <Route path="/home" element={<LegacyPortalRedirect to="/" />} />
+              <Route path="/chat" element={<LegacyPortalRedirect to="/messages" />} />
+              <Route path="/calendar" element={<LegacyPortalRedirect to="/events" />} />
+              <Route path="/team" element={<LegacyPortalRedirect to="/employees" />} />
+              <Route path="/directory" element={<LegacyPortalRedirect to="/employees" />} />
+              <Route path="/account" element={<LegacyPortalRedirect to="/profile" />} />
+              <Route path="/settings" element={<LegacyPortalRedirect to="/profile" />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <Sonner />
+          </TooltipProvider>
+        </AppWrapper>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
