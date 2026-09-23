@@ -117,15 +117,15 @@ describe("Activity Center", () => {
     expect(screen.getByTestId("activity-last-updated").textContent).toMatch(/Last updated/);
 
     holdRequests = true;
-    await userEvent.click(screen.getByRole("button", { name: /refresh activity/i }));
+    fireEvent.click(screen.getByRole("button", { name: /refresh activity/i }));
     // The list stays rendered instead of being replaced by a spinner.
     expect(screen.getByText("Hello there")).toBeInTheDocument();
     expect(screen.queryByText("Loading activity")).not.toBeInTheDocument();
 
     await act(async () => {
+      holdRequests = false;
       deferred.forEach((release) => release());
       deferred = [];
-      holdRequests = false;
     });
     expect(screen.getByText("Hello there")).toBeInTheDocument();
   });
@@ -137,11 +137,12 @@ describe("Activity Center", () => {
 
     holdRequests = true;
     const refresh = screen.getByRole("button", { name: /refresh activity/i });
-    await userEvent.click(refresh);
-    await userEvent.click(refresh);
-    await userEvent.click(refresh);
+    fireEvent.click(refresh);
+    fireEvent.click(refresh);
+    fireEvent.click(refresh);
 
     expect(fromCalls.filter((table) => table === "notifications").length).toBe(before + 1);
+
 
     await act(async () => {
       deferred.forEach((release) => release());
