@@ -154,7 +154,12 @@ export const NotificationCenter = ({ unreadCount, onCountChange, onNavigate }: N
   useRealtimeSubscription("events", fetchActivity, [user]);
   useRealtimeSubscription("notifications", fetchActivity, [user]);
 
-  const visibleItems = useMemo(() => filter === "all" ? items : items.filter((item) => item.kind === filter), [filter, items]);
+  const allowedItems = useMemo(() => items.filter((item) => allowsKind(item.kind)), [items, allowsKind]);
+  const availableFilters = useMemo(() => FILTERS.filter((option) => option.value === "all" || allowsKind(option.value)), [allowsKind]);
+  useEffect(() => {
+    if (filter !== "all" && !allowsKind(filter)) setFilter("all");
+  }, [allowsKind, filter]);
+  const visibleItems = useMemo(() => filter === "all" ? allowedItems : allowedItems.filter((item) => item.kind === filter), [filter, allowedItems]);
   const groupedItems = useMemo(() => {
     const order: ActivityKind[] = ["message", "event", "task", "file"];
     return order
